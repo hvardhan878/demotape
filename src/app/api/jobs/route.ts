@@ -158,26 +158,27 @@ async function renderInDaytona(
     // Write Claude-generated component (overwrites placeholder)
     await sandbox.fs.uploadFile(Buffer.from(componentCode), '/app/component.tsx')
 
-    // Install deps (Remotion + React already cached in image layer; this is fast)
+    // Install any new deps the component may have introduced (fast — layers cached)
     log('npm install...')
     const installResult = await sandbox.process.executeCommand('npm install', '/app', undefined, 90)
     if (installResult.exitCode !== 0) {
       throw new Error(`npm install failed (exit ${installResult.exitCode}): ${installResult.result}`)
     }
 
-    // Run Remotion renderer (bundles + renders frame-by-frame to out/demo.mp4)
-    log('Running Remotion renderer...')
-    const renderResult = await sandbox.process.executeCommand(
-      'node render.mjs',
+    // Run deterministic Framer Motion capture via Chrome Headless Shell + BeginFrame.
+    // capture.mjs: starts Next.js dev server, navigates, records virtual-time frames, outputs out/demo.mp4
+    log('Running capture.mjs (Chrome Headless Shell + BeginFrame)...')
+    const captureResult = await sandbox.process.executeCommand(
+      'node capture.mjs',
       '/app',
       undefined,
-      300
+      360
     )
-    log(`Remotion exit ${renderResult.exitCode}: ${renderResult.result?.slice(-500)}`)
+    log(`capture exit ${captureResult.exitCode}: ${captureResult.result?.slice(-500)}`)
 
-    if (renderResult.exitCode !== 0) {
+    if (captureResult.exitCode !== 0) {
       throw new Error(
-        `Remotion render failed (exit ${renderResult.exitCode}): ${renderResult.result?.slice(-1000)}`
+        `Capture failed (exit ${captureResult.exitCode}): ${captureResult.result?.slice(-1000)}`
       )
     }
 
@@ -186,7 +187,7 @@ async function renderInDaytona(
     log(`out/ contents: ${lsResult.result}`)
 
     if (!lsResult.result?.includes('demo.mp4')) {
-      throw new Error(`demo.mp4 not found after render. out/ contents: ${lsResult.result}`)
+      throw new Error(`demo.mp4 not found after capture. out/ contents: ${lsResult.result}`)
     }
 
     // Download MP4

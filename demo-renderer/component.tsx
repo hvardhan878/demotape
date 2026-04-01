@@ -1,18 +1,26 @@
-// This file is overwritten at render time by Claude-generated code.
-// It must export: Demo (default React component), DURATION_IN_FRAMES, FPS.
-import React from 'react';
-import { useCurrentFrame } from 'remotion';
+'use client'
+// Placeholder — overwritten at render time by Claude-generated code.
+// Must export: default function Demo(), DEMO_DURATION_MS
+import { useEffect } from 'react'
+import { motion } from 'framer-motion'
 
-export const FPS = 30;
-export const DURATION_IN_FRAMES = 30 * 20; // 20 seconds placeholder
+export const DEMO_DURATION_MS = 8000
 
-export const Demo: React.FC = () => {
-  const frame = useCurrentFrame();
+export default function Demo() {
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      ;(window as any).__demoDuration = DEMO_DURATION_MS
+    }
+  }, [])
+
   return (
-    <div style={{ width: 1280, height: 720, background: '#000', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>
-      Frame {frame}
-    </div>
-  );
-};
-
-export default Demo;
+    <motion.div
+      className="w-full h-full flex items-center justify-center bg-gray-950 text-white text-4xl font-bold"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ delay: 0.5, duration: 1 }}
+    >
+      demotape
+    </motion.div>
+  )
+}

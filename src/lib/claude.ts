@@ -12,36 +12,11 @@ export type GeneratedFiles = {
   component: string
 }
 
-const SYSTEM_PROMPT = `You are an expert React and Remotion developer and product designer. Your job is to generate a realistic, high-quality product demo video component using Remotion.
+const SYSTEM_PROMPT = `You are an expert React developer and product designer. Your job is to generate a realistic, high-quality product demo video component using React and Framer Motion.
 
 You will generate ONE file: component.tsx
 
 THE GOAL: Make it look exactly like a screen recording of someone actually using the product. Think Loom-style product walkthroughs. The viewer should feel like they are watching a real person navigate and use the software.
-
-HOW REMOTION WORKS (read carefully -- this is different from normal React):
-- Remotion renders each video frame independently. There is NO real-time clock, NO setInterval, NO setTimeout that fires during rendering.
-- The ONLY way to drive animations is via useCurrentFrame() which returns the current frame number (0, 1, 2, ...).
-- Use interpolate(frame, [startFrame, endFrame], [startValue, endValue], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }) to map frames to values.
-- FPS is 30. So 1 second = 30 frames, 2 seconds = 60 frames, etc.
-- For multi-step sequences, calculate explicit frame offsets: step1 starts at frame 0, step2 starts at frame 60 (2s), step3 at frame 120, etc.
-
-ANIMATION PATTERNS:
-
-Fade in over 0.5s starting at frame 60:
-const opacity = interpolate(frame, [60, 75], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' })
-
-Slide in from right over 0.4s starting at frame 90:
-const x = interpolate(frame, [90, 102], [60, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' })
-
-Show element only after frame 30:
-const visible = frame >= 30
-
-Count-up animation for a number from 0 to 142 over 1s starting at frame 30:
-const count = Math.round(interpolate(frame, [30, 60], [0, 142], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }))
-
-Typing effect for "Hello world" (11 chars, ~2.4 frames per char at 30fps):
-const charsVisible = Math.floor(interpolate(frame, [30, 57], [0, 11], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }))
-const text = "Hello world".slice(0, charsVisible)
 
 WHAT TO BUILD:
 - Render a SINGLE, CONTINUOUS product interface -- like a real app screen the user is already inside
@@ -59,28 +34,55 @@ WHAT GOOD LOOKS LIKE:
 - An analytics tool: a dashboard with live-looking charts, a metric card counting up, a table row highlighting when a threshold is crossed
 - A project manager: a kanban board with a card sliding between columns, a task expanding inline, a comment appearing
 
+ANIMATION PATTERNS (use Framer Motion throughout):
+- Entry animations: initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: X, duration: 0.4 }}
+- Stagger children: use variants with staggerChildren for lists/grids appearing
+- Typing effect: manage a state string with useEffect + setInterval, appending one character at a time
+- Count-up numbers: animate from 0 to target inside a useEffect with a small interval
+- Micro-interactions: scale on hover via whileHover={{ scale: 1.02 }}, subtle shadows
+- Use spring transitions for cards/panels: transition={{ type: 'spring', stiffness: 280, damping: 26 }}
+
+TIMING RULES (critical for the capture harness):
+- The FIRST animation must have transition.delay >= 0.5 (500 ms). This gives the browser time to mount before recording starts.
+- Plan the full animation timeline. Each scene/action takes 3-6 seconds. Aim for 20-28 seconds total.
+- Set DEMO_DURATION_MS to (total animation time in ms) + 1500 ms buffer. E.g. 26500 for a 25-second demo.
+
 TECHNICAL RULES:
-- Use Tailwind CSS (className) for layout and static styles -- it is available in the Remotion environment
-- Use inline style props with interpolated values for animated properties (opacity, transform, etc.)
-- DO NOT use Framer Motion -- it conflicts with Remotion's frame-based renderer. Use only interpolate and useCurrentFrame.
+- 'use client' directive at the top
+- Use Tailwind CSS (className) for layout and static styles
+- Framer Motion: import { motion, AnimatePresence } from 'framer-motion'
+- Use useState + useEffect for sequencing (typing effects, delayed state changes, count-ups)
 - The component is self-contained -- no external props, all data hardcoded with realistic content
 - Dark theme by default unless the brand colour clearly implies light
-- Fixed size: exactly 1280px wide x 720px tall, overflow hidden
-- Total duration: 20-28 seconds (600-840 frames at 30fps). Aim for ~24 seconds (720 frames).
+- Fixed size: exactly 1280px wide x 720px tall, overflow hidden. Wrap everything in a div with style={{ width: 1280, height: 720, overflow: 'hidden', position: 'relative' }}
 - Make every pixel count -- fill the 1280x720 canvas with a complete, polished product UI
 
-REQUIRED EXPORTS -- the file MUST export exactly these (the rendering harness depends on them):
-export const FPS = 30;
-export const DURATION_IN_FRAMES = <your calculated frame count>;
-export const Demo: React.FC = () => { ... };
-export default Demo;
+REQUIRED EXPORTS (the capture harness reads these -- get them exactly right):
 
-IMPORTS -- only use these (no other packages are available):
-import React from 'react';
-import { useCurrentFrame, useVideoConfig, interpolate, AbsoluteFill, Sequence } from 'remotion';
+// Total milliseconds the recording needs to run (your animation length + 1500 ms buffer)
+export const DEMO_DURATION_MS = <your calculated number>
+
+// Default export: the demo component
+export default function Demo() {
+  useEffect(() => {
+    // Signal to the capture harness how long to record
+    if (typeof window !== 'undefined') {
+      ;(window as any).__demoDuration = DEMO_DURATION_MS
+    }
+  }, [])
+
+  // ... your component code ...
+}
+
+IMPORTS -- these packages are available:
+import { useState, useEffect, useRef } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+(Tailwind CSS via className)
+
+Do NOT import from 'remotion', 'next', or any other package.
 
 OUTPUT FORMAT:
-Return ONLY valid JSON with a single key: "component" (string, the full TSX code). No markdown fences, no explanation. Example: {"component": "import React from 'react';\\n..."}`
+Return ONLY valid JSON with a single key: "component" (string, the full TSX code). No markdown fences, no explanation. Example: {"component": "'use client'\\nimport { useState } from 'react'\\n..."}`
 
 export function buildUserMessage(input: ClaudeGenerationInput): string {
   const featuresList = input.features.map((f, i) => `${i + 1}. ${f}`).join('\n')
@@ -92,7 +94,7 @@ Brand colour: ${input.brandColour}
 Target audience: ${input.targetAudience || 'General'}
 Video style: ${input.videoStyle}${input.reprompt ? `\n\nUser refinement request: ${input.reprompt}` : ''}
 
-Generate the Remotion component now.`
+Generate the Framer Motion component now.`
 }
 
 export async function generateDemoFiles(

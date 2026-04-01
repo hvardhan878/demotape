@@ -1,56 +1,81 @@
 /**
  * test-pipeline.ts
  *
- * Standalone script to test the Daytona Remotion render pipeline end-to-end
+ * Standalone script to test the Daytona capture pipeline end-to-end
  * without going through the Next.js API route.
  *
  * Usage:
  *   DAYTONA_API_KEY=xxx CLAUDE_API_KEY=sk-ant-xxx npx tsx test-pipeline.ts
  *
- * Or with sample Remotion component (no Claude):
+ * Or with sample Framer Motion component (no Claude):
  *   DAYTONA_API_KEY=xxx USE_SAMPLE=1 npx tsx test-pipeline.ts
  */
 
 import * as fs from 'fs'
 import * as path from 'path'
 
-const SAMPLE_COMPONENT = `import React from 'react';
-import { useCurrentFrame, interpolate } from 'remotion';
+const SAMPLE_COMPONENT = `'use client'
+import { useState, useEffect } from 'react'
+import { motion } from 'framer-motion'
 
-export const FPS = 30;
-export const DURATION_IN_FRAMES = 30 * 8; // 8s sample
+export const DEMO_DURATION_MS = 9000
 
-export const Demo: React.FC = () => {
-  const frame = useCurrentFrame();
-  const opacity = interpolate(frame, [0, 30], [0, 1], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
+export default function Demo() {
+  const [count, setCount] = useState(0)
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      ;(window as any).__demoDuration = DEMO_DURATION_MS
+    }
+    const interval = setInterval(() => {
+      setCount(c => {
+        if (c >= 100) { clearInterval(interval); return c }
+        return c + 1
+      })
+    }, 60)
+    return () => clearInterval(interval)
+  }, [])
+
   return (
-    <div
-      style={{
-        width: 1280,
-        height: 720,
-        background: '#0a0a0a',
-        color: '#fff',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: 48,
-        fontFamily: 'system-ui, sans-serif',
-        opacity,
-      }}
-    >
-      demotape pipeline test — frame {frame}
+    <div style={{ width: 1280, height: 720, overflow: 'hidden', position: 'relative', background: '#0a0a0a' }}>
+      <motion.div
+        className="w-full h-full flex flex-col items-center justify-center gap-8"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.5, duration: 0.8 }}
+      >
+        <motion.h1
+          className="text-white text-6xl font-bold"
+          initial={{ y: 40, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.7, duration: 0.6 }}
+        >
+          demotape
+        </motion.h1>
+        <motion.div
+          className="text-6xl font-mono text-orange-400"
+          initial={{ scale: 0.5, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ delay: 1.2, type: 'spring', stiffness: 300, damping: 20 }}
+        >
+          {count}%
+        </motion.div>
+        <motion.p
+          className="text-gray-400 text-xl"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 2, duration: 0.6 }}
+        >
+          pipeline test — Framer Motion + Chrome Headless Shell
+        </motion.p>
+      </motion.div>
     </div>
-  );
-};
-
-export default Demo;
+  )
+}
 `
 
 async function main() {
-  console.log('demotape Remotion pipeline test\n')
+  console.log('demotape capture pipeline test\n')
 
   const DAYTONA_API_KEY = process.env.DAYTONA_API_KEY
   const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY
@@ -64,7 +89,7 @@ async function main() {
   let componentCode: string
 
   if (USE_SAMPLE) {
-    console.log('Using sample Remotion component (set CLAUDE_API_KEY for real Claude generation)\n')
+    console.log('Using sample Framer Motion component (set CLAUDE_API_KEY for real Claude generation)\n')
     componentCode = SAMPLE_COMPONENT
   } else {
     console.log('Calling Claude to generate component...')
@@ -106,13 +131,14 @@ async function main() {
     if (installResult.exitCode !== 0) {
       throw new Error(`npm install failed: ${installResult.result}`)
     }
+    console.log('Install OK')
 
-    console.log('node render.mjs...')
-    const renderResult = await sandbox.process.executeCommand('node render.mjs', '/app', undefined, 300)
-    if (renderResult.exitCode !== 0) {
-      throw new Error(`Remotion failed: ${renderResult.result}`)
+    console.log('node capture.mjs (Chrome Headless Shell + BeginFrame)...')
+    const captureResult = await sandbox.process.executeCommand('node capture.mjs', '/app', undefined, 360)
+    if (captureResult.exitCode !== 0) {
+      throw new Error(`Capture failed: ${captureResult.result}`)
     }
-    console.log(renderResult.result?.slice(-800))
+    console.log(captureResult.result?.slice(-800))
 
     console.log('Downloading out/demo.mp4...')
     const mp4Data = await sandbox.fs.downloadFile('/app/out/demo.mp4')

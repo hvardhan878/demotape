@@ -1,6 +1,6 @@
 FROM node:22-bookworm-slim
 
-# Chrome Headless Shell dependencies (required by Remotion)
+# Chrome Headless Shell system deps + ffmpeg
 RUN apt-get update && apt-get install -y \
   libnss3 \
   libdbus-1-3 \
@@ -18,14 +18,14 @@ RUN apt-get update && apt-get install -y \
   libcups2 \
   fonts-liberation \
   fonts-noto-color-emoji \
+  ffmpeg \
   && rm -rf /var/lib/apt/lists/*
 
-# Pre-install the renderer shell (Remotion project)
 WORKDIR /app
 COPY demo-renderer/ .
 RUN npm install
 
-# Download Chrome Headless Shell used by Remotion (cached in the image layer)
-RUN ./node_modules/.bin/remotion browser ensure
+# Download Chrome Headless Shell into the image layer so it is cached
+RUN npx puppeteer browsers install chrome-headless-shell
 
 EXPOSE 3100
