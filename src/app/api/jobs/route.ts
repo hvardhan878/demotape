@@ -137,7 +137,8 @@ async function renderInDaytona(
 
   try {
     const image =
-      process.env.DAYTONA_RENDERER_IMAGE || 'ghcr.io/yourorg/demo-renderer:latest'
+      process.env.DAYTONA_RENDERER_IMAGE ||
+      'ghcr.io/hvardhan878/demotape-renderer:latest'
     sandbox = await daytona.create({ image }, { timeout: 180 })
 
     // Write generated files
