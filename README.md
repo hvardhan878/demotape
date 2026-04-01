@@ -1,36 +1,181 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Demotape (DemoForge)
 
-## Getting Started
+Generate cinematic animated product demo videos with AI. Describe your product → Claude writes the component + Playwright script → Daytona sandbox renders a WebM → you download it.
 
-First, run the development server:
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Framework | Next.js 14 (App Router) |
+| Styling | Tailwind CSS v4 + shadcn/ui |
+| Auth | Clerk |
+| Payments | Stripe (GBP, subscription) |
+| Sandbox | Daytona SDK |
+| Storage | Supabase Storage (WebM, signed URLs) |
+| Database | Supabase (Postgres) |
+| Deployment | Vercel |
+
+## Project Structure
+
+```
+src/
+├── app/
+│   ├── page.tsx                   # Landing page
+│   ├── onboarding/page.tsx        # Claude API key entry
+│   ├── dashboard/page.tsx         # Project list
+│   ├── projects/
+│   │   ├── new/page.tsx           # Create project form
+│   │   └── [id]/page.tsx         # Project detail + video player
+│   ├── settings/
+│   │   ├── page.tsx              # Settings shell (server)
+│   │   └── SettingsClient.tsx    # Settings UI (client)
+│   └── api/
+│       ├── projects/route.ts     # POST /api/projects
+│       ├── jobs/
+│       │   ├── route.ts          # POST /api/jobs (triggers render)
+│       │   └── [jobId]/route.ts  # GET /api/jobs/:id (polling)
+│       ├── stripe/
+│       │   ├── checkout/route.ts # Stripe Checkout
+│       │   └── portal/route.ts   # Stripe Portal
+│       ├── user/
+│       │   ├── onboard/route.ts  # Save encrypted API key
+│       │   └── delete/route.ts   # Delete account
+│       └── webhooks/
+│           ├── clerk/route.ts    # Clerk user sync
+│           └── stripe/route.ts   # Stripe subscription events
+├── components/
+│   ├── AppNav.tsx                # Top navigation bar
+│   └── JobPoller.tsx             # Job status + video player component
+└── lib/
+    ├── supabase.ts               # Supabase admin client + types
+    ├── encryption.ts             # AES-256 API key encryption
+    ├── stripe.ts                 # Stripe client
+    └── claude.ts                 # Claude API call + prompt builder
+
+demo-renderer/                    # Minimal Next.js app for the Docker image
+├── pages/
+│   ├── _app.tsx
+│   ├── index.tsx
+│   ├── demo-record.tsx           # The page Playwright navigates to
+│   └── component.tsx             # Placeholder — replaced at render time by Claude's output
+└── package.json                  # Pre-installed Next.js + Framer Motion
+
+supabase/schema.sql               # Full DB schema + RLS
+Dockerfile                        # Docker image for Daytona sandbox
+test-pipeline.ts                  # Standalone pipeline test script
+```
+
+## Quick Start
+
+### 1. Clone and install
+
+```bash
+git clone <repo>
+cd demo-video
+npm install
+cp .env.example .env.local
+```
+
+### 2. Set up services
+
+#### Clerk
+1. Create a Clerk application at [clerk.com](https://clerk.com)
+2. Copy publishable key and secret key to `.env.local`
+3. Add a webhook endpoint pointing to `https://your-domain.com/api/webhooks/clerk`
+   - Add `CLERK_WEBHOOK_SECRET` to `.env.local`
+   - Enable the `user.created` and `user.deleted` events
+
+#### Supabase
+1. Create a project at [supabase.com](https://supabase.com)
+2. Run `supabase/schema.sql` in the SQL editor
+3. Create a `videos` storage bucket (private, no public access)
+4. Copy URL and service role key to `.env.local`
+
+#### Stripe
+1. Create a product with a recurring price of £20/mo in [Stripe Dashboard](https://dashboard.stripe.com)
+2. Copy secret key, publishable key, and price ID to `.env.local`
+3. Add a webhook endpoint for `checkout.session.completed` and `customer.subscription.deleted`
+4. Copy webhook signing secret to `STRIPE_WEBHOOK_SECRET`
+
+#### Daytona
+1. Get an API key from [app.daytona.io](https://app.daytona.io)
+2. Add it to `DAYTONA_API_KEY`
+3. Build and push the Docker image (see below)
+
+### 3. Build the Docker image
+
+```bash
+# Build and push to ghcr.io (or your registry)
+docker build -t ghcr.io/yourorg/demo-renderer:latest .
+docker push ghcr.io/yourorg/demo-renderer:latest
+```
+
+Then update the image reference in `src/app/api/jobs/route.ts`.
+
+### 4. Run locally
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Environment Variables
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+See `.env.example` for all required variables. Key ones:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Variable | Description |
+|----------|-------------|
+| `ENCRYPTION_SECRET` | 32-char random string for AES-256 API key encryption |
+| `DEMO_TOKEN` | Secret token that the renderer checks before showing the demo page |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key — bypasses RLS, server-side only |
 
-## Learn More
+## Testing the Render Pipeline
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+# Use sample component (no Claude call)
+USE_SAMPLE=1 DAYTONA_API_KEY=xxx npx tsx test-pipeline.ts
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# Use real Claude generation
+DAYTONA_API_KEY=xxx CLAUDE_API_KEY=sk-ant-xxx npx tsx test-pipeline.ts
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Output is saved to `./test-output/demo.webm`.
 
-## Deploy on Vercel
+## Render Pipeline Flow
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```
+POST /api/jobs
+  ↓
+Create job (status: queued)
+  ↓
+Call Claude API with user's key
+  → Returns { component: "...", script: "..." }
+  ↓  (status: generating)
+Create Daytona sandbox (demo-renderer Docker image)
+  ↓  (status: rendering)
+Upload component.tsx + record.py + demo-record.tsx to sandbox
+npm install → npm run build → npm start (port 3100)
+python3 record.py  ← Playwright records /demo-record?token=XXX
+  ↓  (status: uploading)
+Download demo.webm from sandbox
+Upload to Supabase Storage
+Delete sandbox
+  ↓  (status: complete)
+Return signed URL on GET /api/jobs/:id
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Deployment (Vercel)
+
+```bash
+vercel --prod
+```
+
+Add all environment variables in the Vercel dashboard. The render pipeline runs as a long Next.js API handler — consider enabling [Vercel Functions Max Duration](https://vercel.com/docs/functions/runtimes#max-duration) (up to 5 minutes on Pro plan) for the `/api/jobs` route.
+
+## Free vs Pro
+
+| Feature | Free | Pro (£20/mo) |
+|---------|------|--------------|
+| Projects | 1 | Unlimited |
+| Watermark | Yes (UI overlay) | No |
+| Download | WebM | WebM |
+| Reprompt | ✓ | ✓ |
