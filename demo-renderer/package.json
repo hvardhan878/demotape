@@ -13,7 +13,7 @@
     "react-dom": "^18",
     "framer-motion": "^11",
     "tailwindcss": "^3",
-    "puppeteer": "^24",
+    "puppeteer-core": "^24",
     "puppeteer-capture": "^1"
   },
   "devDependencies": {

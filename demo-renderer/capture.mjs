@@ -3,9 +3,10 @@
  * Framer Motion animations are driven by virtual time so every frame is perfect.
  */
 import { capture, launch, PuppeteerCaptureFormat } from 'puppeteer-capture'
-import puppeteer from 'puppeteer'
+import { getInstalledBrowsers } from '@puppeteer/browsers'
 import { mkdirSync } from 'node:fs'
 import { spawn } from 'node:child_process'
+import { homedir } from 'node:os'
 
 mkdirSync('./out', { recursive: true })
 
@@ -39,9 +40,12 @@ const waitForPage = async () => {
 await waitForPage()
 console.log('[capture] page ready')
 
-// ── 3. Launch Chrome Headless Shell with deterministic-mode flags ─────────
-// puppeteer-core needs an explicit path; use puppeteer's browser cache
-const executablePath = puppeteer.executablePath('chrome-headless-shell')
+// ── 3. Find chrome-headless-shell in the puppeteer cache ─────────────────
+const cacheDir = process.env.PUPPETEER_CACHE_DIR || `${homedir()}/.cache/puppeteer`
+const installed = await getInstalledBrowsers({ cacheDir })
+const shell = installed.find(b => b.browser === 'chrome-headless-shell')
+if (!shell) throw new Error(`chrome-headless-shell not found in puppeteer cache (${cacheDir}). Installed: ${JSON.stringify(installed.map(b => b.browser))}`)
+const executablePath = shell.executablePath
 console.log(`[capture] chrome-headless-shell: ${executablePath}`)
 
 const browser = await launch({
