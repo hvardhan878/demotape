@@ -8,6 +8,7 @@ import { Clapperboard, KeyRound, ChevronRight, FolderOpen } from 'lucide-react'
 import ApiKeyDialog from '@/components/ApiKeyDialog'
 import WaitlistDialog from '@/components/WaitlistDialog'
 import { JoinDiscordButton } from '@/components/JoinDiscordButton'
+import { DEMO_PROJECT_ID } from '@/lib/demo-project'
 
 export type DashboardProject = {
   id: string
@@ -30,7 +31,7 @@ export default function DashboardClient({
 }: Props) {
   const router = useRouter()
   const [hasApiKey, setHasApiKey] = useState(initialHasApiKey)
-  const [keyDialogOpen, setKeyDialogOpen] = useState(!initialHasApiKey)
+  const [keyDialogOpen, setKeyDialogOpen] = useState(false)
   const [waitlistOpen, setWaitlistOpen] = useState(initialWaitlistOpen)
   const hasProject = projects.length > 0
 
@@ -78,6 +79,21 @@ export default function DashboardClient({
           <p className="mt-3 text-balance text-white/45">
             Open a project to generate or download your MP4, or start another when Pro launches.
           </p>
+        </div>
+
+        <div className="mb-8">
+          <Link
+            href={`/projects/${DEMO_PROJECT_ID}`}
+            className="group flex items-center justify-between gap-4 rounded-2xl border border-[#F5A623]/30 bg-gradient-to-r from-[#E8621A]/[0.12] to-[#F5A623]/[0.08] px-5 py-4 transition-colors hover:border-[#F5A623]/45 hover:from-[#E8621A]/[0.18] hover:to-[#F5A623]/[0.12]"
+          >
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-[#F5A623]">Example demo</p>
+              <p className="mt-1 text-sm text-white/55">
+                See a finished sample video and layout before you create your own project.
+              </p>
+            </div>
+            <ChevronRight className="h-5 w-5 shrink-0 text-[#F5A623]/70 group-hover:text-[#F5A623]" />
+          </Link>
         </div>
 
         {!hasApiKey && !keyDialogOpen && (

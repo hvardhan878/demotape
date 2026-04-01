@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { supabaseAdmin } from '@/lib/supabase'
 import { SESSION_COOKIE } from '@/lib/session'
+import { isDemoProjectId } from '@/lib/demo-project'
 
 type Params = { params: Promise<{ jobId: string }> }
 
@@ -11,14 +12,28 @@ export async function GET(_req: Request, { params }: Params) {
   const sessionId = cookieStore.get(SESSION_COOKIE)?.value
   if (!sessionId) return NextResponse.json({ error: 'No session' }, { status: 401 })
 
-  const { data: job } = await supabaseAdmin
+  const { data: jobRow } = await supabaseAdmin
     .from('jobs')
-    .select('id, status, error, video_path, created_at, completed_at')
+    .select('id, status, error, video_path, created_at, completed_at, session_id, project_id')
     .eq('id', jobId)
-    .eq('session_id', sessionId)
     .single()
 
-  if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+  if (!jobRow) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+
+  const ownsJob = jobRow.session_id === sessionId
+  const isDemoJob = jobRow.project_id && isDemoProjectId(jobRow.project_id)
+  if (!ownsJob && !isDemoJob) {
+    return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+  }
+
+  const job = {
+    id: jobRow.id,
+    status: jobRow.status,
+    error: jobRow.error,
+    video_path: jobRow.video_path,
+    created_at: jobRow.created_at,
+    completed_at: jobRow.completed_at,
+  }
 
   let videoUrl: string | null = null
   if (job.status === 'complete' && job.video_path) {

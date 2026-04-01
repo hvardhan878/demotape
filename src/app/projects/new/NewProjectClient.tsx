@@ -33,7 +33,7 @@ type Props = {
 export default function NewProjectClient({ initialHasApiKey }: Props) {
   const router = useRouter()
   const [hasApiKey, setHasApiKey] = useState(initialHasApiKey)
-  const [keyDialogOpen, setKeyDialogOpen] = useState(!initialHasApiKey)
+  const [keyDialogOpen, setKeyDialogOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 

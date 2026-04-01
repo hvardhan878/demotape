@@ -1,6 +1,7 @@
 import { redirect, notFound } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getSessionId, getDbSession } from '@/lib/session'
+import { isDemoProjectId } from '@/lib/demo-project'
 import AppNav from '@/components/AppNav'
 import JobPoller from '@/components/JobPoller'
 import { Badge } from '@/components/ui/badge'
@@ -15,13 +16,13 @@ export default async function ProjectPage({ params }: Props) {
   if (!sessionId) redirect('/dashboard')
 
   const session = await getDbSession(sessionId)
+  const isDemo = isDemoProjectId(id)
 
-  const { data: project } = await supabaseAdmin
-    .from('projects')
-    .select('*')
-    .eq('id', id)
-    .eq('session_id', sessionId)
-    .single()
+  const projectQuery = isDemo
+    ? supabaseAdmin.from('projects').select('*').eq('id', id).single()
+    : supabaseAdmin.from('projects').select('*').eq('id', id).eq('session_id', sessionId).single()
+
+  const { data: project } = await projectQuery
 
   if (!project) notFound()
 
@@ -31,7 +32,10 @@ export default async function ProjectPage({ params }: Props) {
     .eq('project_id', id)
     .order('created_at', { ascending: false })
     .limit(1)
-    .single()
+    .maybeSingle()
+
+  const viewerCanGenerate = !isDemo || project.session_id === sessionId
+  const readOnlyExample = isDemo && !viewerCanGenerate
 
   return (
     <div className="min-h-screen bg-[#030303]">
@@ -44,6 +48,14 @@ export default async function ProjectPage({ params }: Props) {
           <ChevronLeft className="h-4 w-4" />
           Back to Dashboard
         </Link>
+        {readOnlyExample && (
+          <div className="mb-6 rounded-xl border border-[#F5A623]/25 bg-[#F5A623]/[0.08] px-4 py-3 text-sm text-white/80">
+            <span className="font-medium text-[#F5A623]">Example project</span>
+            {' — '}
+            You&apos;re viewing a shared sample. Create your own project from the dashboard to generate
+            a video with your product.
+          </div>
+        )}
         <div className="mb-8">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
@@ -83,13 +95,18 @@ export default async function ProjectPage({ params }: Props) {
 
         <div className="space-y-2 mb-6">
           <h2 className="text-base font-semibold text-white">Demo Video</h2>
-          <p className="text-sm text-white/40">Generate a cinematic animated demo using your product details above.</p>
+          <p className="text-sm text-white/40">
+            {readOnlyExample
+              ? 'Sample output from demotape. Use the dashboard to build your own.'
+              : 'Generate a cinematic animated demo using your product details above.'}
+          </p>
         </div>
 
         <JobPoller
           projectId={project.id}
           initialJobId={latestJob?.id ?? null}
           hasApiKey={!!session?.encrypted_claude_key}
+          readOnlyExample={readOnlyExample}
         />
       </main>
     </div>

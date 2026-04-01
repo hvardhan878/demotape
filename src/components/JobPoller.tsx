@@ -12,7 +12,6 @@ import {
   XCircle,
   Download,
   RefreshCw,
-  Sparkles,
 } from 'lucide-react'
 import WaitlistDialog from '@/components/WaitlistDialog'
 import { JoinDiscordButton } from '@/components/JoinDiscordButton'
@@ -47,9 +46,16 @@ type Props = {
   projectId: string
   initialJobId?: string | null
   hasApiKey: boolean
+  /** Viewing the shared demo as a non-owner: no generate, no API key nag */
+  readOnlyExample?: boolean
 }
 
-export default function JobPoller({ projectId, initialJobId, hasApiKey }: Props) {
+export default function JobPoller({
+  projectId,
+  initialJobId,
+  hasApiKey,
+  readOnlyExample = false,
+}: Props) {
   const [job, setJob] = useState<JobState | null>(null)
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState('')
@@ -126,10 +132,16 @@ export default function JobPoller({ projectId, initialJobId, hasApiKey }: Props)
 
   const isRunning = job && !['complete', 'failed'].includes(job.status)
 
-  const keyGate = !hasApiKey
+  const keyGate = !readOnlyExample && !hasApiKey
 
   return (
     <div className="space-y-6">
+      {readOnlyExample && !initialJobId && (
+        <p className="text-sm text-white/40">
+          No sample video is linked yet. Check back soon, or create your own project from the dashboard.
+        </p>
+      )}
+
       {keyGate && (
         <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100/90">
           <p className="font-medium text-amber-100 mb-1">Claude API key required</p>
@@ -146,7 +158,7 @@ export default function JobPoller({ projectId, initialJobId, hasApiKey }: Props)
       )}
 
       {/* Generate button */}
-      {(!job || job.status === 'failed') && !isRunning && (
+      {!readOnlyExample && (!job || job.status === 'failed') && !isRunning && (
         <div className="space-y-3">
           <Button
             onClick={() => triggerJob()}
@@ -257,7 +269,7 @@ export default function JobPoller({ projectId, initialJobId, hasApiKey }: Props)
       />
 
       {/* Regenerate → waitlist (beta) */}
-      {job && (job.status === 'complete' || job.status === 'failed') && (
+      {!readOnlyExample && job && (job.status === 'complete' || job.status === 'failed') && (
         <div className="border-t border-white/[0.06] pt-6">
           <p className="mb-3 flex items-center gap-2 text-sm font-medium text-white/70">
             <RefreshCw className="h-4 w-4" />
