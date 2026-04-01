@@ -26,6 +26,6 @@ COPY demo-renderer/ .
 RUN npm install
 
 # Download Chrome Headless Shell used by Remotion (cached in the image layer)
-RUN npx remotion browser ensure
+RUN ./node_modules/.bin/remotion browser ensure
 
 EXPOSE 3100
