@@ -180,23 +180,34 @@ async function renderInDaytona(
     }
     log('capture.mjs launched, polling for completion...')
 
-    // Poll every 10 s for up to 10 minutes
-    const MAX_WAIT_MS = 10 * 60 * 1000
-    const POLL_INTERVAL_MS = 10_000
+    // Retry wrapper — Daytona occasionally drops TLS connections transiently
+    const exec = async (cmd: string, timeout = 15) => {
+      for (let attempt = 0; attempt < 4; attempt++) {
+        try {
+          return await sandbox!.process.executeCommand(cmd, '/app', undefined, timeout)
+        } catch (err) {
+          if (attempt === 3) throw err
+          log(`poll command failed (attempt ${attempt + 1}/4), retrying in 8s: ${err}`)
+          await new Promise(r => setTimeout(r, 8000))
+        }
+      }
+      throw new Error('unreachable')
+    }
+
+    // Poll every 15 s for up to 12 minutes.
+    // ffmpeg creates the output file immediately; only treat it as done once the
+    // capture process has fully exited (and therefore ffmpeg has been finalized).
+    const MAX_WAIT_MS = 12 * 60 * 1000
+    const POLL_INTERVAL_MS = 15_000
     const deadline = Date.now() + MAX_WAIT_MS
 
     while (Date.now() < deadline) {
       await new Promise(r => setTimeout(r, POLL_INTERVAL_MS))
 
-      // Do not treat "file exists" as success because ffmpeg creates the output
-      // file immediately and only finalizes the MP4 container on process exit.
-      const poll = await sandbox.process.executeCommand(
+      const poll = await exec(
         'if kill -0 $(cat /app/capture.pid 2>/dev/null) 2>/dev/null; then echo "RUNNING"; ' +
         'elif [ -f /app/out/demo.mp4 ]; then echo "DONE"; ' +
-        'else echo "STOPPED"; fi',
-        '/app',
-        undefined,
-        15
+        'else echo "STOPPED"; fi'
       )
       const state = poll.result?.trim()
       log(`poll: ${state}`)
@@ -207,50 +218,30 @@ async function renderInDaytona(
       }
 
       if (state === 'STOPPED') {
-        const captureLog = await sandbox.process.executeCommand(
-          'tail -50 /app/capture.log 2>/dev/null || echo "(no log)"',
-          '/app', undefined, 10
-        )
+        const captureLog = await exec('tail -50 /app/capture.log 2>/dev/null || echo "(no log)"', 10)
         throw new Error(`capture.mjs exited without producing demo.mp4.\nLog:\n${captureLog.result}`)
       }
 
       // Still RUNNING — log progress tail
-      const tail = await sandbox.process.executeCommand(
-        'tail -3 /app/capture.log 2>/dev/null || true',
-        '/app', undefined, 10
-      )
+      const tail = await exec('tail -3 /app/capture.log 2>/dev/null || true', 10)
       if (tail.result?.trim()) log(`log tail: ${tail.result.trim()}`)
     }
 
-    // Final existence + size check after the process has exited and ffmpeg has
-    // flushed the MP4 metadata.
-    const lsResult = await sandbox.process.executeCommand('ls -lh /app/out/', '/app', undefined, 10)
+    // Final existence + size check
+    const lsResult = await exec('ls -lh /app/out/', 10)
     log(`out/ contents: ${lsResult.result}`)
     if (!lsResult.result?.includes('demo.mp4')) {
-      const captureLog = await sandbox.process.executeCommand(
-        'tail -80 /app/capture.log 2>/dev/null || echo "(no log)"',
-        '/app', undefined, 10
-      )
+      const captureLog = await exec('tail -80 /app/capture.log 2>/dev/null || echo "(no log)"', 10)
       throw new Error(`demo.mp4 not found after polling timeout.\nLog:\n${captureLog.result}`)
     }
 
-    const sizeResult = await sandbox.process.executeCommand(
-      'wc -c < /app/out/demo.mp4',
-      '/app',
-      undefined,
-      10
-    )
+    const sizeResult = await exec('wc -c < /app/out/demo.mp4', 10)
     const mp4Size = Number(sizeResult.result?.trim() ?? '0')
     log(`demo.mp4 size: ${mp4Size} bytes`)
     if (!Number.isFinite(mp4Size) || mp4Size < 50_000) {
-      const captureLog = await sandbox.process.executeCommand(
-        'tail -80 /app/capture.log 2>/dev/null || echo "(no log)"',
-        '/app',
-        undefined,
-        10
-      )
+      const captureLog = await exec('tail -80 /app/capture.log 2>/dev/null || echo "(no log)"', 10)
       throw new Error(
-        `demo.mp4 looks too small (${mp4Size} bytes), capture likely did not finalize correctly.\nLog:\n${captureLog.result}`
+        `demo.mp4 too small (${mp4Size} bytes) — capture likely failed.\nLog:\n${captureLog.result}`
       )
     }
 

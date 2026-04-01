@@ -59,11 +59,12 @@ const browser = await launch({
 const page = await browser.newPage()
 await page.setViewport({ width: 1280, height: 720 })
 
-// ── 4. Set up recorder (30 fps, H.264 CRF 15) ────────────────────────────
-// Do NOT mix `size` with a `-vf scale` in customFfmpegConfig — ffmpeg rejects both.
-// Let puppeteer-capture auto-detect the frame size from the viewport.
+// ── 4. Set up recorder (24 fps, H.264 CRF 18) ────────────────────────────
+// 24 fps gives smooth motion and cuts BeginFrame count by 20% vs 30fps.
+// Do NOT mix `size` with a `-vf scale` — ffmpeg rejects both.
+// Let puppeteer-capture auto-detect frame size from viewport.
 const recorder = await capture(page, {
-  fps: 30,
+  fps: 24,
   format: PuppeteerCaptureFormat.MP4('fast'),
   customFfmpegConfig: async (ffmpeg) => {
     ffmpeg.outputOptions([
@@ -87,8 +88,10 @@ await new Promise(r => setTimeout(r, 900))
 await recorder.start('./out/demo.mp4')
 console.log('[capture] recording started (deterministic virtual time)')
 
-const durationMs = await page.evaluate(() => window.__demoDuration ?? 28000)
-console.log(`[capture] recording ${durationMs} ms of virtual time at 30 fps`)
+// Cap at 18 s to keep render time under 3 min on 1 vCPU
+const rawDuration = await page.evaluate(() => window.__demoDuration ?? 18000)
+const durationMs = Math.min(rawDuration, 18000)
+console.log(`[capture] recording ${durationMs} ms of virtual time at 24 fps`)
 
 await recorder.waitForTimeout(durationMs)
 console.log('[capture] virtual time done, stopping recorder')
