@@ -6,27 +6,17 @@ export async function POST(req: Request) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // Check plan limits
-  const { data: userRecord } = await supabaseAdmin
-    .from('users')
-    .select('plan')
-    .eq('id', userId)
-    .single()
+  // Everyone is limited to 1 project for now
+  const { count } = await supabaseAdmin
+    .from('projects')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
 
-  if (!userRecord) return NextResponse.json({ error: 'User not found' }, { status: 404 })
-
-  if (userRecord.plan === 'free') {
-    const { count } = await supabaseAdmin
-      .from('projects')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', userId)
-
-    if ((count ?? 0) >= 1) {
-      return NextResponse.json(
-        { error: 'Free plan is limited to 1 project. Please upgrade to Pro.' },
-        { status: 403 }
-      )
-    }
+  if ((count ?? 0) >= 1) {
+    return NextResponse.json(
+      { error: 'You already have a project. demotape is currently limited to one project per user.' },
+      { status: 403 }
+    )
   }
 
   const { name, description, features, brandColour, targetAudience, videoStyle } = await req.json()

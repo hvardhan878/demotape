@@ -43,12 +43,10 @@ const getProgress = (status: JobStatus): number => {
 
 type Props = {
   projectId: string
-  isPro: boolean
   initialJobId?: string | null
-  onNewJob?: (jobId: string) => void
 }
 
-export default function JobPoller({ projectId, isPro, initialJobId, onNewJob }: Props) {
+export default function JobPoller({ projectId, initialJobId }: Props) {
   const [job, setJob] = useState<JobState | null>(null)
   const [generating, setGenerating] = useState(false)
   const [reprompt, setReprompt] = useState('')
@@ -67,7 +65,6 @@ export default function JobPoller({ projectId, isPro, initialJobId, onNewJob }: 
     }
   }, [])
 
-  // Start polling when we have a jobId
   useEffect(() => {
     if (!job?.id) return
     if (job.status === 'complete' || job.status === 'failed') return
@@ -82,7 +79,6 @@ export default function JobPoller({ projectId, isPro, initialJobId, onNewJob }: 
     return () => clearInterval(interval)
   }, [job?.id, job?.status, pollJob])
 
-  // Load initial job if provided
   useEffect(() => {
     if (initialJobId) {
       setJob({ id: initialJobId, status: 'queued' })
@@ -114,10 +110,8 @@ export default function JobPoller({ projectId, isPro, initialJobId, onNewJob }: 
       }
 
       const { jobId } = await res.json()
-      const newJob: JobState = { id: jobId, status: 'queued' }
-      setJob(newJob)
+      setJob({ id: jobId, status: 'queued' })
       setReprompt('')
-      onNewJob?.(jobId)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start render')
     } finally {
@@ -130,7 +124,7 @@ export default function JobPoller({ projectId, isPro, initialJobId, onNewJob }: 
 
   return (
     <div className="space-y-6">
-      {/* Generate button (shown when no job or job failed) */}
+      {/* Generate button */}
       {(!job || job.status === 'failed') && !isRunning && (
         <div className="space-y-3">
           <Button
@@ -185,10 +179,7 @@ export default function JobPoller({ projectId, isPro, initialJobId, onNewJob }: 
           </div>
 
           {job.status !== 'failed' && (
-            <Progress
-              value={getProgress(job.status)}
-              className="h-1.5 bg-white/10"
-            />
+            <Progress value={getProgress(job.status)} className="h-1.5 bg-white/10" />
           )}
 
           {job.status === 'failed' && job.error && (
@@ -202,7 +193,7 @@ export default function JobPoller({ projectId, isPro, initialJobId, onNewJob }: 
       {/* Video player */}
       {job?.status === 'complete' && job.videoUrl && (
         <div className="space-y-3">
-          <div className="relative rounded-2xl overflow-hidden border border-white/[0.08]">
+          <div className="rounded-2xl overflow-hidden border border-white/[0.08]">
             <video
               src={job.videoUrl}
               controls
@@ -212,36 +203,21 @@ export default function JobPoller({ projectId, isPro, initialJobId, onNewJob }: 
             >
               <source src={job.videoUrl} type="video/webm" />
             </video>
-
-            {/* Watermark overlay */}
-            {!isPro && (
-              <div className="absolute bottom-3 right-3 z-10 bg-black/60 text-white text-xs px-2 py-1 rounded backdrop-blur-sm pointer-events-none">
-                Made with DemoForge
-              </div>
-            )}
           </div>
 
-          {/* Download */}
-          <div className="flex items-center gap-3">
-            <a href={job.videoUrl} download="demo.webm" target="_blank" rel="noopener noreferrer">
-              <Button
-                variant="outline"
-                className="border-white/20 text-white/80 hover:text-white hover:border-white/40 gap-2"
-              >
-                <Download className="w-4 h-4" />
-                Download WebM
-              </Button>
-            </a>
-            {!isPro && (
-              <span className="text-xs text-white/30">
-                Upgrade to Pro to remove watermark
-              </span>
-            )}
-          </div>
+          <a href={job.videoUrl} download="demo.webm" target="_blank" rel="noopener noreferrer">
+            <Button
+              variant="outline"
+              className="border-white/20 text-white/80 hover:text-white hover:border-white/40 gap-2"
+            >
+              <Download className="w-4 h-4" />
+              Download WebM
+            </Button>
+          </a>
         </div>
       )}
 
-      {/* Reprompt (shown after complete or failed) */}
+      {/* Reprompt */}
       {job && (job.status === 'complete' || job.status === 'failed') && (
         <div className="border-t border-white/[0.06] pt-6">
           <p className="text-sm font-medium text-white/70 mb-3 flex items-center gap-2">
@@ -252,7 +228,7 @@ export default function JobPoller({ projectId, isPro, initialJobId, onNewJob }: 
             <Input
               value={reprompt}
               onChange={(e) => setReprompt(e.target.value)}
-              placeholder='e.g. "Make it slower", "Add a third screen showing the dashboard"'
+              placeholder='e.g. "Make it slower", "Add a screen showing the dashboard"'
               className="bg-white/[0.05] border-white/10 text-white placeholder:text-white/20 focus:border-indigo-500"
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && reprompt.trim() && !reprompting) {

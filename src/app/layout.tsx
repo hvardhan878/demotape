@@ -6,8 +6,8 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'DemoForge — Cinematic Product Demo Videos',
-  description: 'Turn your product description into a cinematic animated demo video in minutes. Powered by AI.',
+  title: 'demotape — AI product demo videos',
+  description: 'Describe your product and get a cinematic animated demo video in minutes.',
 }
 
 export default function RootLayout({

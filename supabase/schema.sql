@@ -61,6 +61,18 @@ create policy "No anon access to users" on users for all using (false);
 create policy "No anon access to projects" on projects for all using (false);
 create policy "No anon access to jobs" on jobs for all using (false);
 
+-- Pro waitlist
+create table if not exists waitlist (
+  id uuid primary key default gen_random_uuid(),
+  email text not null unique,
+  willing_to_pay text not null,
+  user_id text references users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+alter table waitlist enable row level security;
+create policy "No anon access to waitlist" on waitlist for all using (false);
+
 -- ============================================================
 -- Storage
 -- Run this separately or via the Supabase dashboard:

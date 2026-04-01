@@ -10,18 +10,14 @@ export default async function SettingsPage() {
 
   const { data: userRecord } = await supabaseAdmin
     .from('users')
-    .select('plan, stripe_customer_id, encrypted_claude_key')
+    .select('encrypted_claude_key')
     .eq('id', userId)
     .single()
-
-  const isPro = userRecord?.plan === 'pro'
-  const hasKey = !!userRecord?.encrypted_claude_key
-  const stripeCustomerId = userRecord?.stripe_customer_id ?? null
 
   return (
     <div className="min-h-screen bg-[#030303]">
       <AppNav />
-      <SettingsClient isPro={isPro} hasKey={hasKey} stripeCustomerId={stripeCustomerId} />
+      <SettingsClient hasKey={!!userRecord?.encrypted_claude_key} />
     </div>
   )
 }
