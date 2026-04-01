@@ -204,25 +204,26 @@ async function renderInDaytona(
     while (Date.now() < deadline) {
       await new Promise(r => setTimeout(r, POLL_INTERVAL_MS))
 
+      // Check sentinel file written by capture.mjs on completion/failure.
+      // Avoids zombie-PID false-positives from kill -0.
       const poll = await exec(
-        'if kill -0 $(cat /app/capture.pid 2>/dev/null) 2>/dev/null; then echo "RUNNING"; ' +
-        'elif [ -f /app/out/demo.mp4 ]; then echo "DONE"; ' +
-        'else echo "STOPPED"; fi'
+        'if [ -f /app/capture.done ]; then cat /app/capture.done; ' +
+        'else echo "RUNNING"; fi'
       )
-      const state = poll.result?.trim()
-      log(`poll: ${state}`)
+      const sentinel = poll.result?.trim()
+      log(`poll: ${sentinel === '0' ? 'DONE' : sentinel === '1' ? 'FAILED' : 'RUNNING'}`)
 
-      if (state === 'DONE') {
-        log('demo.mp4 ready')
+      if (sentinel === '0') {
+        log('capture sentinel: success')
         break
       }
 
-      if (state === 'STOPPED') {
-        const captureLog = await exec('tail -50 /app/capture.log 2>/dev/null || echo "(no log)"', 10)
-        throw new Error(`capture.mjs exited without producing demo.mp4.\nLog:\n${captureLog.result}`)
+      if (sentinel === '1') {
+        const captureLog = await exec('tail -60 /app/capture.log 2>/dev/null || echo "(no log)"', 10)
+        throw new Error(`capture.mjs reported failure.\nLog:\n${captureLog.result}`)
       }
 
-      // Still RUNNING — log progress tail
+      // Still running — log tail for visibility
       const tail = await exec('tail -3 /app/capture.log 2>/dev/null || true', 10)
       if (tail.result?.trim()) log(`log tail: ${tail.result.trim()}`)
     }

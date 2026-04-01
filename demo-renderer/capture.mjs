@@ -10,6 +10,13 @@ import { spawn } from 'node:child_process'
 
 mkdirSync('./out', { recursive: true })
 
+// Write failure sentinel on any uncaught crash so polling never hangs
+process.on('uncaughtException', (err) => {
+  console.error('[capture] uncaught:', err)
+  try { import('node:fs').then(fs => fs.writeFileSync('/app/capture.done', '1')) } catch {}
+  process.exit(1)
+})
+
 // ── 1. Start Next.js dev server ───────────────────────────────────────────
 const server = spawn('node', ['node_modules/.bin/next', 'dev', '-p', '3100'], {
   stdio: ['ignore', 'pipe', 'pipe'],
@@ -106,14 +113,18 @@ await new Promise(r => setTimeout(r, durationMs + 500))
 await recorder.stop()
 await browser.close()
 
-const { statSync } = await import('node:fs')
+const { statSync, writeFileSync } = await import('node:fs')
 const size = statSync('./out/demo.mp4').size
 console.log(`[capture] done → ./out/demo.mp4 (${(size / 1024).toFixed(0)} KB)`)
+
 if (size < 50_000) {
   console.error('[capture] ERROR: output is too small — recording likely failed')
+  writeFileSync('/app/capture.done', '1')
   cleanup()
   process.exit(1)
 }
 
+// Write sentinel so the polling loop knows we finished cleanly
+writeFileSync('/app/capture.done', '0')
 cleanup()
 process.exit(0)
