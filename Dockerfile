@@ -1,38 +1,31 @@
-FROM node:20-slim
+FROM node:22-bookworm-slim
 
-# Python, Chromium, and required system dependencies
+# Chrome Headless Shell dependencies (required by Remotion)
 RUN apt-get update && apt-get install -y \
-  python3 \
-  python3-pip \
-  chromium \
-  ffmpeg \
-  xvfb \
-  x11-utils \
-  fonts-liberation \
-  libgbm1 \
   libnss3 \
+  libdbus-1-3 \
   libatk1.0-0 \
-  libatk-bridge2.0-0 \
-  libcups2 \
-  libdrm2 \
-  libxkbcommon0 \
+  libgbm-dev \
+  libasound2 \
+  libxrandr2 \
+  libxkbcommon-dev \
+  libxfixes3 \
   libxcomposite1 \
   libxdamage1 \
-  libxfixes3 \
-  libxrandr2 \
-  libasound2 \
-  libpangocairo-1.0-0 \
+  libatk-bridge2.0-0 \
   libpango-1.0-0 \
   libcairo2 \
+  libcups2 \
+  fonts-liberation \
+  fonts-noto-color-emoji \
   && rm -rf /var/lib/apt/lists/*
 
-# Install Playwright Python (sync API) and install Chromium browser binary
-RUN pip3 install playwright --break-system-packages
-RUN playwright install chromium --with-deps
-
-# Pre-install the renderer shell Next.js app
+# Pre-install the renderer shell (Remotion project)
 WORKDIR /app
 COPY demo-renderer/ .
 RUN npm install
+
+# Download Chrome Headless Shell used by Remotion (cached in the image layer)
+RUN npx remotion browser ensure
 
 EXPOSE 3100

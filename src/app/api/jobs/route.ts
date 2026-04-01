@@ -111,7 +111,7 @@ async function runRenderPipeline({
 
   // Step 2: Render in Daytona sandbox
   await updateStatus('rendering')
-  const mp4Bytes = await renderInDaytona(jobId, generated.component, generated.script)
+  const mp4Bytes = await renderInDaytona(jobId, generated.component)
 
   // Step 3: Upload to Supabase Storage
   await updateStatus('uploading')
@@ -135,8 +135,7 @@ async function runRenderPipeline({
 
 async function renderInDaytona(
   jobId: string,
-  componentCode: string,
-  scriptCode: string
+  componentCode: string
 ): Promise<Buffer> {
   const { Daytona } = await import('@daytonaio/sdk')
 
@@ -153,82 +152,46 @@ async function renderInDaytona(
       process.env.DAYTONA_RENDERER_IMAGE ||
       'ghcr.io/hvardhan878/demotape-renderer:latest'
     log(`Creating sandbox with image: ${image}`)
-    // Request 2 vCPU + 2 GiB RAM — headful Chrome + Xvfb + ffmpeg are CPU-hungry
-    sandbox = await daytona.create(
-      { image, resources: { cpu: 2, memory: 2 } },
-      { timeout: 180 }
-    )
+    sandbox = await daytona.create({ image }, { timeout: 180 })
     log(`Sandbox created: ${sandbox.id}`)
 
-    // Write Claude-generated files
+    // Write Claude-generated component (overwrites placeholder)
     await sandbox.fs.uploadFile(Buffer.from(componentCode), '/app/component.tsx')
-    await sandbox.fs.uploadFile(Buffer.from(scriptCode), '/app/record.py')
 
-    // Write the demo-record page — no token check since this is an ephemeral private sandbox
-    await sandbox.fs.uploadFile(Buffer.from(getDemoPageTemplate()), '/app/pages/demo-record.tsx')
-
-    // Ensure recordings directory exists before Playwright runs
-    await sandbox.process.executeCommand('mkdir -p /app/recordings', '/app')
-
-    // Install deps
+    // Install deps (Remotion + React already cached in image layer; this is fast)
     log('npm install...')
     const installResult = await sandbox.process.executeCommand('npm install', '/app', undefined, 90)
     if (installResult.exitCode !== 0) {
       throw new Error(`npm install failed (exit ${installResult.exitCode}): ${installResult.result}`)
     }
 
-    // Build Next.js
-    log('npm run build...')
-    const buildResult = await sandbox.process.executeCommand('npm run build', '/app', undefined, 120)
-    if (buildResult.exitCode !== 0) {
-      throw new Error(`npm build failed (exit ${buildResult.exitCode}): ${buildResult.result}`)
-    }
-
-    // Start Next.js in background and wait for it to be ready
-    log('Starting Next.js...')
-    await sandbox.process.executeCommand(
-      'nohup npm start -- -p 3100 > /app/server.log 2>&1 &',
+    // Run Remotion renderer (bundles + renders frame-by-frame to out/demo.mp4)
+    log('Running Remotion renderer...')
+    const renderResult = await sandbox.process.executeCommand(
+      'node render.mjs',
       '/app',
       undefined,
-      10
+      300
     )
-    // Poll until the server responds (up to 15 seconds)
-    await sandbox.process.executeCommand(
-      'for i in $(seq 1 15); do curl -sf http://localhost:3100 && break || sleep 1; done',
-      '/app',
-      undefined,
-      20
-    )
+    log(`Remotion exit ${renderResult.exitCode}: ${renderResult.result?.slice(-500)}`)
 
-    // Run Playwright recorder
-    log('Running Playwright recorder...')
-    const playwrightResult = await sandbox.process.executeCommand(
-      'python3 record.py',
-      '/app',
-      { DEMO_TOKEN: 'internal' },
-      180
-    )
-    log(`Playwright exit ${playwrightResult.exitCode}: ${playwrightResult.result}`)
-
-    if (playwrightResult.exitCode !== 0) {
+    if (renderResult.exitCode !== 0) {
       throw new Error(
-        `Playwright recorder failed (exit ${playwrightResult.exitCode}): ${playwrightResult.result}`
+        `Remotion render failed (exit ${renderResult.exitCode}): ${renderResult.result?.slice(-1000)}`
       )
     }
 
-    // Verify the file exists before downloading
-    const lsResult = await sandbox.process.executeCommand('ls -lh /app/recordings/', '/app')
-    log(`recordings/ contents: ${lsResult.result}`)
+    // Verify output
+    const lsResult = await sandbox.process.executeCommand('ls -lh /app/out/', '/app')
+    log(`out/ contents: ${lsResult.result}`)
 
     if (!lsResult.result?.includes('demo.mp4')) {
-      throw new Error(
-        `demo.mp4 not found after recording/encoding. recordings/ contents: ${lsResult.result}`
-      )
+      throw new Error(`demo.mp4 not found after render. out/ contents: ${lsResult.result}`)
     }
 
     // Download MP4
     log('Downloading demo.mp4...')
-    const mp4Data = await sandbox.fs.downloadFile('/app/recordings/demo.mp4')
+    const mp4Data = await sandbox.fs.downloadFile('/app/out/demo.mp4')
     return Buffer.from(mp4Data)
   } finally {
     if (sandbox) {
@@ -239,26 +202,3 @@ async function renderInDaytona(
   }
 }
 
-function getDemoPageTemplate(): string {
-  // No token check — this page only exists inside an ephemeral private Daytona sandbox.
-  return `import dynamic from 'next/dynamic'
-
-const Demo = dynamic(() => import('../component'), { ssr: false })
-
-export default function DemoRecord() {
-  return (
-    <div
-      style={{
-        width: 1280,
-        height: 720,
-        overflow: 'hidden',
-        position: 'relative',
-        background: '#000',
-      }}
-    >
-      <Demo />
-    </div>
-  )
-}
-`
-}
