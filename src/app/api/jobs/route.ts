@@ -126,7 +126,6 @@ async function renderInDaytona(
   componentCode: string,
   scriptCode: string
 ): Promise<Buffer> {
-  // Dynamic import to avoid bundling issues
   const { Daytona } = await import('@daytonaio/sdk')
 
   const daytona = new Daytona({
@@ -135,30 +134,84 @@ async function renderInDaytona(
 
   let sandbox: Awaited<ReturnType<typeof daytona.create>> | null = null
 
+  const log = (msg: string) => console.log(`[job:${jobId}] ${msg}`)
+
   try {
     const image =
       process.env.DAYTONA_RENDERER_IMAGE ||
       'ghcr.io/hvardhan878/demotape-renderer:latest'
+    log(`Creating sandbox with image: ${image}`)
     sandbox = await daytona.create({ image }, { timeout: 180 })
+    log(`Sandbox created: ${sandbox.id}`)
 
-    // Write generated files
+    // Write Claude-generated files
     await sandbox.fs.uploadFile(Buffer.from(componentCode), '/app/component.tsx')
     await sandbox.fs.uploadFile(Buffer.from(scriptCode), '/app/record.py')
 
-    // Write demo-record page
-    const demoPageTemplate = getDemoPageTemplate()
-    await sandbox.fs.uploadFile(Buffer.from(demoPageTemplate), '/app/pages/demo-record.tsx')
+    // Write the demo-record page — no token check since this is an ephemeral private sandbox
+    await sandbox.fs.uploadFile(Buffer.from(getDemoPageTemplate()), '/app/pages/demo-record.tsx')
 
-    // Install, build, start Next.js
-    await sandbox.process.executeCommand('npm install', '/app', undefined, 60)
-    await sandbox.process.executeCommand('npm run build', '/app', undefined, 90)
-    await sandbox.process.executeCommand('npm start -- -p 3100 &', '/app', undefined, 10)
-    await sandbox.process.executeCommand('sleep 5', '/app')
+    // Ensure recordings directory exists before Playwright runs
+    await sandbox.process.executeCommand('mkdir -p /app/recordings', '/app')
+
+    // Install deps
+    log('npm install...')
+    const installResult = await sandbox.process.executeCommand('npm install', '/app', undefined, 90)
+    if (installResult.exitCode !== 0) {
+      throw new Error(`npm install failed (exit ${installResult.exitCode}): ${installResult.result}`)
+    }
+
+    // Build Next.js
+    log('npm run build...')
+    const buildResult = await sandbox.process.executeCommand('npm run build', '/app', undefined, 120)
+    if (buildResult.exitCode !== 0) {
+      throw new Error(`npm build failed (exit ${buildResult.exitCode}): ${buildResult.result}`)
+    }
+
+    // Start Next.js in background and wait for it to be ready
+    log('Starting Next.js...')
+    await sandbox.process.executeCommand(
+      'nohup npm start -- -p 3100 > /app/server.log 2>&1 &',
+      '/app',
+      undefined,
+      10
+    )
+    // Poll until the server responds (up to 15 seconds)
+    await sandbox.process.executeCommand(
+      'for i in $(seq 1 15); do curl -sf http://localhost:3100 && break || sleep 1; done',
+      '/app',
+      undefined,
+      20
+    )
 
     // Run Playwright recorder
-    await sandbox.process.executeCommand('python3 record.py', '/app', undefined, 120)
+    log('Running Playwright recorder...')
+    const playwrightResult = await sandbox.process.executeCommand(
+      'python3 record.py',
+      '/app',
+      { DEMO_TOKEN: 'internal' },
+      120
+    )
+    log(`Playwright exit ${playwrightResult.exitCode}: ${playwrightResult.result}`)
+
+    if (playwrightResult.exitCode !== 0) {
+      throw new Error(
+        `Playwright recorder failed (exit ${playwrightResult.exitCode}): ${playwrightResult.result}`
+      )
+    }
+
+    // Verify the file exists before downloading
+    const lsResult = await sandbox.process.executeCommand('ls -lh /app/recordings/', '/app')
+    log(`recordings/ contents: ${lsResult.result}`)
+
+    if (!lsResult.result?.includes('demo.webm')) {
+      throw new Error(
+        `demo.webm not found after recording. recordings/ contents: ${lsResult.result}`
+      )
+    }
 
     // Download WebM
+    log('Downloading demo.webm...')
     const webmData = await sandbox.fs.downloadFile('/app/recordings/demo.webm')
     return Buffer.from(webmData)
   } finally {
@@ -171,23 +224,22 @@ async function renderInDaytona(
 }
 
 function getDemoPageTemplate(): string {
-  return `import { useRouter } from 'next/router'
-import dynamic from 'next/dynamic'
+  // No token check — this page only exists inside an ephemeral private Daytona sandbox.
+  return `import dynamic from 'next/dynamic'
 
-const Demo = dynamic(() => import('../../component'), { ssr: false })
-
-const DEMO_TOKEN = process.env.DEMO_TOKEN || ''
+const Demo = dynamic(() => import('../component'), { ssr: false })
 
 export default function DemoRecord() {
-  const router = useRouter()
-
-  if (typeof window !== 'undefined' && router.query.token !== DEMO_TOKEN) {
-    router.replace('/')
-    return null
-  }
-
   return (
-    <div style={{ width: 1280, height: 720, overflow: 'hidden', position: 'relative' }}>
+    <div
+      style={{
+        width: 1280,
+        height: 720,
+        overflow: 'hidden',
+        position: 'relative',
+        background: '#000',
+      }}
+    >
       <Demo />
     </div>
   )

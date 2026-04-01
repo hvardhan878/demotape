@@ -34,8 +34,8 @@ RULES FOR THE REACT COMPONENT:
 RULES FOR THE PLAYWRIGHT SCRIPT:
 - Use Python with Playwright (sync API)
 - Launch Chromium headless, viewport 1280x720
-- Navigate to http://localhost:3100/demo-record?token=DEMO_TOKEN
-- Enable video recording to ./recordings/ directory via record_video_dir
+- Navigate to http://localhost:3100/demo-record (no token needed)
+- Enable video recording to ./recordings/ directory via record_video_dir with size {"width": 1280, "height": 720}
 - Calculate total recording duration by summing all Framer Motion animation durations with a 500ms buffer per scene transition — you wrote the component so you know exactly how long it takes
 - Use time.sleep() to wait exactly that long
 - Close the browser context to trigger the WebM file write
@@ -70,7 +70,7 @@ export async function generateDemoFiles(
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-5',
+      model: 'claude-sonnet-4-6',
       // claude-sonnet-4-5 supports up to 64 000 output tokens.
       // Component + script JSON can easily exceed 8 k tokens, bumping to 16 k
       // gives plenty of headroom while keeping latency reasonable.
