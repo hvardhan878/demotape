@@ -1,19 +1,21 @@
-import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 import { supabaseAdmin } from '@/lib/supabase'
+import { SESSION_COOKIE } from '@/lib/session'
 
 type Params = { params: Promise<{ jobId: string }> }
 
 export async function GET(_req: Request, { params }: Params) {
   const { jobId } = await params
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const cookieStore = await cookies()
+  const sessionId = cookieStore.get(SESSION_COOKIE)?.value
+  if (!sessionId) return NextResponse.json({ error: 'No session' }, { status: 401 })
 
   const { data: job } = await supabaseAdmin
     .from('jobs')
     .select('id, status, error, video_path, created_at, completed_at')
     .eq('id', jobId)
-    .eq('user_id', userId)
+    .eq('session_id', sessionId)
     .single()
 
   if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })

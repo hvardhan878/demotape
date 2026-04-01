@@ -40,7 +40,19 @@ RULES FOR THE PLAYWRIGHT SCRIPT:
 - Use time.sleep() to wait exactly that long
 - Close the browser context to trigger the WebM file write
 - After context closes, rename the output file to demo.webm (Playwright names it with a UUID by default — find and rename the newest .webm file in ./recordings/)
-- Do NOT run ffmpeg — WebM output is the final deliverable
+- After renaming to demo.webm, run ffmpeg to produce a high-quality H.264 MP4:
+  import subprocess
+  subprocess.run([
+      'ffmpeg', '-y',
+      '-i', './recordings/demo.webm',
+      '-c:v', 'libx264',
+      '-preset', 'slow',
+      '-crf', '18',
+      '-pix_fmt', 'yuv420p',
+      '-movflags', '+faststart',
+      './recordings/demo.mp4'
+  ], check=True)
+- The final deliverable is demo.mp4 — demo.webm is only an intermediate file
 
 OUTPUT FORMAT:
 Return ONLY valid JSON with two keys: "component" (string, the full TSX code) and "script" (string, the full Python code). No markdown, no explanation, just the raw JSON object.`

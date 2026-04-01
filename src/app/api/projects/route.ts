@@ -1,22 +1,46 @@
-import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 import { supabaseAdmin } from '@/lib/supabase'
+import { SESSION_COOKIE, getClientIp } from '@/lib/session'
+import { ensureSessionRow } from '@/lib/ensure-session'
 
 export async function POST(req: Request) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const cookieStore = await cookies()
+  const sessionId = cookieStore.get(SESSION_COOKIE)?.value
+  if (!sessionId) return NextResponse.json({ error: 'No session' }, { status: 401 })
 
-  // Everyone is limited to 1 project for now
-  const { count } = await supabaseAdmin
+  const ensured = await ensureSessionRow(sessionId)
+  if (!ensured.ok) {
+    return NextResponse.json({ error: 'Failed to create session' }, { status: 500 })
+  }
+
+  // One project per session
+  const { count: sessionCount } = await supabaseAdmin
     .from('projects')
     .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId)
+    .eq('session_id', sessionId)
 
-  if ((count ?? 0) >= 1) {
+  if ((sessionCount ?? 0) >= 1) {
     return NextResponse.json(
-      { error: 'You already have a project. demotape is currently limited to one project per user.' },
+      { error: 'demotape is currently limited to one project per session.' },
       { status: 403 }
     )
+  }
+
+  // IP rate limit — one project per IP to prevent abuse
+  const ip = await getClientIp()
+  if (ip !== 'unknown') {
+    const { count: ipCount } = await supabaseAdmin
+      .from('projects')
+      .select('id', { count: 'exact', head: true })
+      .eq('ip_address', ip)
+
+    if ((ipCount ?? 0) >= 1) {
+      return NextResponse.json(
+        { error: 'One project per network is allowed during the beta.' },
+        { status: 429 }
+      )
+    }
   }
 
   const { name, description, features, brandColour, targetAudience, videoStyle } = await req.json()
@@ -28,7 +52,8 @@ export async function POST(req: Request) {
   const { data: project, error } = await supabaseAdmin
     .from('projects')
     .insert({
-      user_id: userId,
+      session_id: sessionId,
+      ip_address: ip,
       name: name.trim(),
       description: description.trim(),
       features: features ?? [],

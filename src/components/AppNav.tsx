@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { UserButton } from '@clerk/nextjs'
 import { Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -17,24 +16,21 @@ export default function AppNav() {
           <span className="text-indigo-400">demo</span>tape
         </Link>
 
-        <div className="flex items-center gap-3">
-          <Link href="/settings">
-            <Button
-              variant="ghost"
-              size="sm"
-              className={cn(
-                'gap-2 text-sm h-8',
-                pathname === '/settings'
-                  ? 'text-white bg-white/[0.08]'
-                  : 'text-white/50 hover:text-white/80'
-              )}
-            >
-              <Settings className="w-4 h-4" />
-              Settings
-            </Button>
-          </Link>
-          <UserButton />
-        </div>
+        <Link href="/settings">
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(
+              'gap-2 text-sm h-8',
+              pathname === '/settings'
+                ? 'text-white bg-white/[0.08]'
+                : 'text-white/50 hover:text-white/80'
+            )}
+          >
+            <Settings className="w-4 h-4" />
+            Settings
+          </Button>
+        </Link>
       </div>
     </nav>
   )

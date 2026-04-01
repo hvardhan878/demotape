@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
-import { auth } from '@clerk/nextjs/server'
+import { cookies } from 'next/headers'
 import { supabaseAdmin } from '@/lib/supabase'
+import { SESSION_COOKIE } from '@/lib/session'
 
 export async function POST(req: Request) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const cookieStore = await cookies()
+  const sessionId = cookieStore.get(SESSION_COOKIE)?.value ?? null
 
   const { email, willingToPay } = await req.json()
 
@@ -16,7 +17,7 @@ export async function POST(req: Request) {
     {
       email: email.trim().toLowerCase(),
       willing_to_pay: willingToPay.trim(),
-      user_id: userId,
+      session_id: sessionId,
     },
     { onConflict: 'email' }
   )

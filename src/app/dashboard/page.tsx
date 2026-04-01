@@ -1,35 +1,40 @@
-import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
+import { getSessionId, getDbSession } from '@/lib/session'
 import { supabaseAdmin } from '@/lib/supabase'
+import AppNav from '@/components/AppNav'
+import DashboardClient from './DashboardClient'
 
-// Dashboard is a smart redirect — users only ever have one project.
-// No project → /projects/new
-// Has project  → /projects/[id]
 export default async function DashboardPage() {
-  const { userId } = await auth()
-  if (!userId) redirect('/sign-in')
+  const sessionId = await getSessionId()
+  if (!sessionId) {
+    return (
+      <div className="min-h-screen bg-[#030303]">
+        <AppNav />
+        <div className="mx-auto max-w-md px-6 py-20 text-center text-white/50">
+          <p>Loading your session… refresh if this persists.</p>
+        </div>
+      </div>
+    )
+  }
 
-  // Ensure user exists and has a key
-  const { data: userRecord } = await supabaseAdmin
-    .from('users')
-    .select('id, encrypted_claude_key')
-    .eq('id', userId)
-    .single()
-
-  if (!userRecord) redirect('/onboarding')
-  if (!userRecord.encrypted_claude_key) redirect('/onboarding')
-
-  // Find their single project (if any)
   const { data: projects } = await supabaseAdmin
     .from('projects')
     .select('id')
-    .eq('user_id', userId)
+    .eq('session_id', sessionId)
     .order('created_at', { ascending: true })
     .limit(1)
 
   if (projects && projects.length > 0) {
     redirect(`/projects/${projects[0].id}`)
-  } else {
-    redirect('/projects/new')
   }
+
+  const session = await getDbSession(sessionId)
+  const initialHasApiKey = !!session?.encrypted_claude_key
+
+  return (
+    <div className="min-h-screen bg-[#030303]">
+      <AppNav />
+      <DashboardClient initialHasApiKey={initialHasApiKey} />
+    </div>
+  )
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -44,9 +45,10 @@ const getProgress = (status: JobStatus): number => {
 type Props = {
   projectId: string
   initialJobId?: string | null
+  hasApiKey: boolean
 }
 
-export default function JobPoller({ projectId, initialJobId }: Props) {
+export default function JobPoller({ projectId, initialJobId, hasApiKey }: Props) {
   const [job, setJob] = useState<JobState | null>(null)
   const [generating, setGenerating] = useState(false)
   const [reprompt, setReprompt] = useState('')
@@ -106,7 +108,16 @@ export default function JobPoller({ projectId, initialJobId }: Props) {
 
       if (!res.ok) {
         const data = await res.json()
-        throw new Error(data.error || 'Failed to start job')
+        const msg = data.error || 'Failed to start job'
+        if (
+          typeof msg === 'string' &&
+          (msg.includes('Claude API key') || msg.includes('API key not configured'))
+        ) {
+          throw new Error(
+            'Add your Claude API key in Settings before generating. Open Settings → save your key, then try again.'
+          )
+        }
+        throw new Error(msg)
       }
 
       const { jobId } = await res.json()
@@ -122,15 +133,32 @@ export default function JobPoller({ projectId, initialJobId }: Props) {
 
   const isRunning = job && !['complete', 'failed'].includes(job.status)
 
+  const keyGate = !hasApiKey
+
   return (
     <div className="space-y-6">
+      {keyGate && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100/90">
+          <p className="font-medium text-amber-100 mb-1">Claude API key required</p>
+          <p className="text-amber-100/75 mb-3">
+            Save your Anthropic API key in Settings to generate demo videos. Your key is encrypted and never logged.
+          </p>
+          <Link
+            href="/settings#api-key"
+            className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-[#E8621A] hover:bg-[#F5A623] text-white h-9 px-4 transition-colors"
+          >
+            Open Settings
+          </Link>
+        </div>
+      )}
+
       {/* Generate button */}
       {(!job || job.status === 'failed') && !isRunning && (
         <div className="space-y-3">
           <Button
             onClick={() => triggerJob()}
-            disabled={generating}
-            className="bg-indigo-600 hover:bg-indigo-500 text-white gap-2 h-11 px-6"
+            disabled={generating || keyGate}
+            className="bg-indigo-600 hover:bg-indigo-500 text-white gap-2 h-11 px-6 disabled:opacity-50"
           >
             {generating ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -143,6 +171,14 @@ export default function JobPoller({ projectId, initialJobId }: Props) {
             <p className="text-sm text-red-400 flex items-center gap-1.5">
               <XCircle className="w-4 h-4" /> {error}
             </p>
+          )}
+          {error && error.includes('Settings') && (
+            <Link
+              href="/settings#api-key"
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium border border-white/20 text-white/90 hover:bg-white/5 h-9 px-4"
+            >
+              Go to Settings
+            </Link>
           )}
         </div>
       )}
@@ -201,11 +237,11 @@ export default function JobPoller({ projectId, initialJobId }: Props) {
               loop
               className="w-full aspect-video bg-black"
             >
-              <source src={job.videoUrl} type="video/webm" />
+              <source src={job.videoUrl} type="video/mp4" />
             </video>
           </div>
 
-          <a href={job.videoUrl} download="demo.webm" target="_blank" rel="noopener noreferrer">
+          <a href={job.videoUrl} download="demo.mp4" target="_blank" rel="noopener noreferrer">
             <Button
               variant="outline"
               className="border-white/20 text-white/80 hover:text-white hover:border-white/40 gap-2"
@@ -238,7 +274,7 @@ export default function JobPoller({ projectId, initialJobId }: Props) {
             />
             <Button
               onClick={() => triggerJob(reprompt.trim())}
-              disabled={reprompting || !reprompt.trim()}
+              disabled={reprompting || !reprompt.trim() || keyGate}
               className="bg-indigo-600 hover:bg-indigo-500 text-white shrink-0"
             >
               {reprompting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Regenerate'}

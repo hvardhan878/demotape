@@ -1,23 +1,15 @@
-import { auth } from '@clerk/nextjs/server'
-import { redirect } from 'next/navigation'
-import { supabaseAdmin } from '@/lib/supabase'
+import { getSessionId, getDbSession } from '@/lib/session'
 import AppNav from '@/components/AppNav'
 import SettingsClient from './SettingsClient'
 
 export default async function SettingsPage() {
-  const { userId } = await auth()
-  if (!userId) redirect('/sign-in')
-
-  const { data: userRecord } = await supabaseAdmin
-    .from('users')
-    .select('encrypted_claude_key')
-    .eq('id', userId)
-    .single()
+  const sessionId = await getSessionId()
+  const session = sessionId ? await getDbSession(sessionId) : null
 
   return (
     <div className="min-h-screen bg-[#030303]">
       <AppNav />
-      <SettingsClient hasKey={!!userRecord?.encrypted_claude_key} />
+      <SettingsClient hasKey={!!session?.encrypted_claude_key} />
     </div>
   )
 }

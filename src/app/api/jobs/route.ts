@@ -1,45 +1,47 @@
-import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 import { supabaseAdmin } from '@/lib/supabase'
 import { decryptApiKey } from '@/lib/encryption'
 import { generateDemoFiles } from '@/lib/claude'
+import { SESSION_COOKIE } from '@/lib/session'
 
 export async function POST(req: Request) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const cookieStore = await cookies()
+  const sessionId = cookieStore.get(SESSION_COOKIE)?.value
+  if (!sessionId) return NextResponse.json({ error: 'No session' }, { status: 401 })
 
   const { projectId, reprompt } = await req.json()
   if (!projectId) return NextResponse.json({ error: 'projectId is required' }, { status: 400 })
 
-  // Verify project belongs to user
+  // Verify project belongs to this session
   const { data: project } = await supabaseAdmin
     .from('projects')
     .select('*')
     .eq('id', projectId)
-    .eq('user_id', userId)
+    .eq('session_id', sessionId)
     .single()
 
   if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
 
-  // Get user + decrypted API key
-  const { data: userRecord } = await supabaseAdmin
-    .from('users')
-    .select('encrypted_claude_key, plan')
-    .eq('id', userId)
+  // Get session + decrypted API key
+  const { data: session } = await supabaseAdmin
+    .from('sessions')
+    .select('encrypted_claude_key')
+    .eq('id', sessionId)
     .single()
 
-  if (!userRecord?.encrypted_claude_key) {
+  if (!session?.encrypted_claude_key) {
     return NextResponse.json({ error: 'Claude API key not configured' }, { status: 400 })
   }
 
-  const claudeApiKey = decryptApiKey(userRecord.encrypted_claude_key)
+  const claudeApiKey = decryptApiKey(session.encrypted_claude_key)
 
   // Create job record
   const { data: job, error: jobError } = await supabaseAdmin
     .from('jobs')
     .insert({
       project_id: projectId,
-      user_id: userId,
+      session_id: sessionId,
       status: 'queued',
       reprompt: reprompt ?? null,
     })
@@ -99,16 +101,16 @@ async function runRenderPipeline({
 
   // Step 2: Render in Daytona sandbox
   await updateStatus('rendering')
-  const webmBytes = await renderInDaytona(jobId, generated.component, generated.script)
+  const mp4Bytes = await renderInDaytona(jobId, generated.component, generated.script)
 
   // Step 3: Upload to Supabase Storage
   await updateStatus('uploading')
-  const videoPath = `${jobId}.webm`
+  const videoPath = `${jobId}.mp4`
 
   const { error: uploadError } = await supabaseAdmin.storage
     .from('videos')
-    .upload(videoPath, webmBytes, {
-      contentType: 'video/webm',
+    .upload(videoPath, mp4Bytes, {
+      contentType: 'video/mp4',
       upsert: true,
     })
 
@@ -204,16 +206,16 @@ async function renderInDaytona(
     const lsResult = await sandbox.process.executeCommand('ls -lh /app/recordings/', '/app')
     log(`recordings/ contents: ${lsResult.result}`)
 
-    if (!lsResult.result?.includes('demo.webm')) {
+    if (!lsResult.result?.includes('demo.mp4')) {
       throw new Error(
-        `demo.webm not found after recording. recordings/ contents: ${lsResult.result}`
+        `demo.mp4 not found after recording/encoding. recordings/ contents: ${lsResult.result}`
       )
     }
 
-    // Download WebM
-    log('Downloading demo.webm...')
-    const webmData = await sandbox.fs.downloadFile('/app/recordings/demo.webm')
-    return Buffer.from(webmData)
+    // Download MP4
+    log('Downloading demo.mp4...')
+    const mp4Data = await sandbox.fs.downloadFile('/app/recordings/demo.mp4')
+    return Buffer.from(mp4Data)
   } finally {
     if (sandbox) {
       await daytona.delete(sandbox).catch((e: Error) =>

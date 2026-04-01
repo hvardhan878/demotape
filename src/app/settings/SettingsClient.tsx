@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -14,6 +15,7 @@ type Props = {
 }
 
 export default function SettingsClient({ hasKey }: Props) {
+  const router = useRouter()
   const [apiKey, setApiKey] = useState('')
   const [keyLoading, setKeyLoading] = useState(false)
   const [keySuccess, setKeySuccess] = useState(false)
@@ -31,7 +33,7 @@ export default function SettingsClient({ hasKey }: Props) {
     setKeyError('')
     setKeySuccess(false)
     try {
-      const res = await fetch('/api/user/onboard', {
+      const res = await fetch('/api/session/key', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ claudeApiKey: apiKey.trim() }),
@@ -42,6 +44,7 @@ export default function SettingsClient({ hasKey }: Props) {
       }
       setKeySuccess(true)
       setApiKey('')
+      router.refresh()
     } catch (err) {
       setKeyError(err instanceof Error ? err.message : 'Failed to update API key')
     } finally {
@@ -78,11 +81,17 @@ export default function SettingsClient({ hasKey }: Props) {
     <main className="max-w-2xl mx-auto px-6 py-10 space-y-6">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-white">Settings</h1>
-        <p className="text-white/40 text-sm mt-1">Manage your account</p>
+        <p className="text-white/40 text-sm mt-1">API keys and waitlist</p>
       </div>
 
+      {!hasKey && (
+        <div className="rounded-xl border border-amber-500/25 bg-amber-500/[0.08] px-4 py-3 text-sm text-amber-100/90">
+          Add your Claude API key below to generate demo videos from the project page.
+        </div>
+      )}
+
       {/* Claude API Key */}
-      <Card className="bg-white/[0.03] border-white/[0.08] rounded-2xl">
+      <Card id="api-key" className="bg-white/[0.03] border-white/[0.08] rounded-2xl scroll-mt-24">
         <CardHeader>
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-indigo-500/20 flex items-center justify-center text-indigo-400">
@@ -127,7 +136,7 @@ export default function SettingsClient({ hasKey }: Props) {
               disabled={keyLoading || !apiKey.trim()}
               className="bg-indigo-600 hover:bg-indigo-500 text-white"
             >
-              {keyLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Update Key'}
+              {keyLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : hasKey ? 'Update key' : 'Save key'}
             </Button>
           </form>
         </CardContent>
