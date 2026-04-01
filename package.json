@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "docker:build": "docker build --platform linux/amd64 -t demotape-renderer:local .",
+    "docker:run": "docker run --rm -p 3100:3100 demotape-renderer:local"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",

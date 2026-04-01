@@ -100,17 +100,27 @@ cp .env.example .env.local
 #### Daytona
 1. Get an API key from [app.daytona.io](https://app.daytona.io)
 2. Add it to `DAYTONA_API_KEY`
-3. Build and push the Docker image (see below)
+3. **CI image (recommended):** Push to `main` — GitHub Actions builds and pushes to **GitHub Container Registry**:
+   - **Packages:** GitHub profile → **Packages**, or `https://github.com/<username>?tab=packages`
+   - **Image:** `ghcr.io/<your-github-username>/demotape-renderer:latest`
+   - Set `DAYTONA_RENDERER_IMAGE` in `.env.local` / Vercel to that full URL.
+4. **Private packages:** If the package is private, configure registry access in Daytona so sandboxes can pull it (or make the package public for pull-only).
 
 ### 3. Build the Docker image
 
+**On your machine (linux/amd64 — same as CI / Daytona):**
+
 ```bash
-# Build and push to ghcr.io (or your registry)
-docker build -t ghcr.io/yourorg/demo-renderer:latest .
-docker push ghcr.io/yourorg/demo-renderer:latest
+npm run docker:build
+# optional: npm run docker:run   # serves renderer on http://localhost:3100
 ```
 
-Then update the image reference in `src/app/api/jobs/route.ts`.
+**Or manually push** (after `docker login ghcr.io`):
+
+```bash
+docker build --platform linux/amd64 -t ghcr.io/YOUR_USER/demotape-renderer:latest .
+docker push ghcr.io/YOUR_USER/demotape-renderer:latest
+```
 
 ### 4. Run locally
 
