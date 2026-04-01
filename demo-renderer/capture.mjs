@@ -54,22 +54,20 @@ const browser = await launch({
     '--no-sandbox',
     '--disable-setuid-sandbox',
     '--disable-dev-shm-usage',
-    '--force-device-scale-factor=2',   // 2560×1440 internal → downscaled by ffmpeg
   ],
 })
 const page = await browser.newPage()
-// CSS viewport: 1280×720; physical pixels: 2560×1440 (device scale = 2)
-await page.setViewport({ width: 1280, height: 720, deviceScaleFactor: 2 })
+await page.setViewport({ width: 1280, height: 720 })
 
 // ── 4. Set up recorder (30 fps, H.264 CRF 15) ────────────────────────────
+// Do NOT mix `size` with a `-vf scale` in customFfmpegConfig — ffmpeg rejects both.
+// Let puppeteer-capture auto-detect the frame size from the viewport.
 const recorder = await capture(page, {
   fps: 30,
-  size: '1280x720',            // ffmpeg scales 2560×1440 → 1280×720 (lanczos)
-  format: PuppeteerCaptureFormat.MP4('slow'),
+  format: PuppeteerCaptureFormat.MP4('fast'),
   customFfmpegConfig: async (ffmpeg) => {
     ffmpeg.outputOptions([
-      '-vf', 'scale=1280:720:flags=lanczos',
-      '-crf', '15',
+      '-crf', '18',
       '-pix_fmt', 'yuv420p',
       '-movflags', '+faststart',
     ])
@@ -93,11 +91,19 @@ const durationMs = await page.evaluate(() => window.__demoDuration ?? 28000)
 console.log(`[capture] recording ${durationMs} ms of virtual time at 30 fps`)
 
 await recorder.waitForTimeout(durationMs)
+console.log('[capture] virtual time done, stopping recorder')
 
 // ── 7. Finish ─────────────────────────────────────────────────────────────
 await recorder.stop()
 await recorder.detach()
 await browser.close()
-console.log('[capture] done → ./out/demo.mp4')
+
+const { statSync } = await import('node:fs')
+const size = statSync('./out/demo.mp4').size
+console.log(`[capture] done → ./out/demo.mp4 (${size} bytes)`)
+if (size < 1000) {
+  console.error('[capture] ERROR: output file is suspiciously small — ffmpeg may have failed')
+  process.exit(1)
+}
 cleanup()
 process.exit(0)

@@ -188,10 +188,11 @@ async function renderInDaytona(
     while (Date.now() < deadline) {
       await new Promise(r => setTimeout(r, POLL_INTERVAL_MS))
 
-      // Check if output file exists (success) or process has exited (failure)
+      // Do not treat "file exists" as success because ffmpeg creates the output
+      // file immediately and only finalizes the MP4 container on process exit.
       const poll = await sandbox.process.executeCommand(
-        'if [ -f /app/out/demo.mp4 ]; then echo "DONE"; ' +
-        'elif kill -0 $(cat /app/capture.pid 2>/dev/null) 2>/dev/null; then echo "RUNNING"; ' +
+        'if kill -0 $(cat /app/capture.pid 2>/dev/null) 2>/dev/null; then echo "RUNNING"; ' +
+        'elif [ -f /app/out/demo.mp4 ]; then echo "DONE"; ' +
         'else echo "STOPPED"; fi',
         '/app',
         undefined,
@@ -221,7 +222,8 @@ async function renderInDaytona(
       if (tail.result?.trim()) log(`log tail: ${tail.result.trim()}`)
     }
 
-    // Final existence check
+    // Final existence + size check after the process has exited and ffmpeg has
+    // flushed the MP4 metadata.
     const lsResult = await sandbox.process.executeCommand('ls -lh /app/out/', '/app', undefined, 10)
     log(`out/ contents: ${lsResult.result}`)
     if (!lsResult.result?.includes('demo.mp4')) {
@@ -230,6 +232,26 @@ async function renderInDaytona(
         '/app', undefined, 10
       )
       throw new Error(`demo.mp4 not found after polling timeout.\nLog:\n${captureLog.result}`)
+    }
+
+    const sizeResult = await sandbox.process.executeCommand(
+      'wc -c < /app/out/demo.mp4',
+      '/app',
+      undefined,
+      10
+    )
+    const mp4Size = Number(sizeResult.result?.trim() ?? '0')
+    log(`demo.mp4 size: ${mp4Size} bytes`)
+    if (!Number.isFinite(mp4Size) || mp4Size < 50_000) {
+      const captureLog = await sandbox.process.executeCommand(
+        'tail -80 /app/capture.log 2>/dev/null || echo "(no log)"',
+        '/app',
+        undefined,
+        10
+      )
+      throw new Error(
+        `demo.mp4 looks too small (${mp4Size} bytes), capture likely did not finalize correctly.\nLog:\n${captureLog.result}`
+      )
     }
 
     // Download MP4
