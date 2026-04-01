@@ -14,7 +14,7 @@
     "framer-motion": "^11",
     "tailwindcss": "^3",
     "puppeteer-core": "^24",
-    "puppeteer-capture": "^1"
+    "puppeteer-screen-recorder": "^3"
   },
   "devDependencies": {
     "@types/node": "^20",

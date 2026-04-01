@@ -44,9 +44,9 @@ ANIMATION PATTERNS (use Framer Motion throughout):
 
 TIMING RULES (critical for the capture harness):
 - The FIRST animation must have transition.delay >= 0.5 (500 ms). This gives the browser time to mount before recording starts.
-- Plan the full animation timeline. Each scene/action takes 2-4 seconds. Total must be 12-15 seconds.
-- Set DEMO_DURATION_MS to (total animation time in ms) + 1000 ms buffer. E.g. 15000 for a 14-second demo.
-- NEVER exceed 15000 for DEMO_DURATION_MS — the render budget is capped at 15 seconds.
+- Plan the full animation timeline. Each scene/action takes 3-5 seconds. Aim for 20-25 seconds total.
+- Set DEMO_DURATION_MS to (total animation time in ms) + 1000 ms buffer. E.g. 24000 for a 23-second demo.
+- NEVER exceed 25000 for DEMO_DURATION_MS.
 
 TECHNICAL RULES:
 - 'use client' directive at the top
