@@ -51,29 +51,74 @@ TECHNICAL RULES:
 - Total duration should be 18-30 seconds of continuous product action
 - Use React hooks (useState, useEffect, useRef) alongside Framer Motion to drive sequential timed actions
 - Make every pixel count — fill the 1280×720 canvas with a complete, polished product UI
+- IMPORTANT: Add a 700ms initial pause before the very first animation begins. Use a useEffect with setTimeout or Framer Motion delay props. This is required for the recorder to fully initialise before animations start.
 
 RULES FOR THE PLAYWRIGHT SCRIPT:
-- Use Python with Playwright (sync API)
-- Launch Chromium headless, viewport 1280x720
-- Navigate to http://localhost:3100/demo-record (no token needed)
-- Enable video recording to ./recordings/ directory via record_video_dir with size {"width": 1280, "height": 720}
-- Calculate total recording duration by summing all Framer Motion animation durations with a 500ms buffer per scene transition — you wrote the component so you know exactly how long it takes
-- Use time.sleep() to wait exactly that long
-- Close the browser context to trigger the WebM file write
-- After context closes, rename the output file to demo.webm (Playwright names it with a UUID by default — find and rename the newest .webm file in ./recordings/)
-- After renaming to demo.webm, run ffmpeg to produce a high-quality H.264 MP4:
-  import subprocess
-  subprocess.run([
+- Use Python with Playwright (sync API) and subprocess
+- Do NOT use Playwright's built-in record_video_dir — it produces low-quality output
+- Use Xvfb virtual display + headful Chrome + ffmpeg x11grab for clean 60fps H.264 recording
+- Follow this EXACT structure:
+
+  import subprocess, time, signal, os
+  from playwright.sync_api import sync_playwright
+
+  os.makedirs('./recordings', exist_ok=True)
+
+  # 1. Start Xvfb virtual display (1280x720 24-bit)
+  xvfb = subprocess.Popen([
+      'Xvfb', ':99', '-screen', '0', '1280x720x24',
+      '-ac', '+extension', 'GLX', '+render', '-noreset'
+  ])
+  time.sleep(1.0)
+
+  # 2. Point DISPLAY at the virtual screen
+  os.environ['DISPLAY'] = ':99'
+
+  # 3. Start ffmpeg capturing the virtual display at 60fps
+  ffmpeg = subprocess.Popen([
       'ffmpeg', '-y',
-      '-i', './recordings/demo.webm',
-      '-c:v', 'libx264',
-      '-preset', 'slow',
-      '-crf', '18',
-      '-pix_fmt', 'yuv420p',
-      '-movflags', '+faststart',
+      '-f', 'x11grab', '-r', '60', '-s', '1280x720', '-i', ':99.0',
+      '-c:v', 'libx264', '-preset', 'fast', '-crf', '15',
+      '-pix_fmt', 'yuv420p', '-movflags', '+faststart',
       './recordings/demo.mp4'
-  ], check=True)
-- The final deliverable is demo.mp4 — demo.webm is only an intermediate file
+  ], stderr=subprocess.DEVNULL)
+  time.sleep(0.5)  # let ffmpeg initialise
+
+  # 4. Launch Playwright headfully on the virtual display
+  with sync_playwright() as p:
+      browser = p.chromium.launch(
+          headless=False,
+          args=[
+              '--no-sandbox', '--disable-setuid-sandbox',
+              '--disable-gpu', '--window-size=1280,720',
+              '--window-position=0,0', '--kiosk',
+              '--disable-infobars', '--no-first-run',
+              '--no-default-browser-check',
+          ]
+      )
+      context = browser.new_context(viewport={'width': 1280, 'height': 720})
+      page = context.new_page()
+      page.goto('http://localhost:3100/demo-record')
+      page.wait_for_load_state('networkidle')
+
+      # The component has a 700ms initial delay before animating.
+      # Wait for the full animation duration + that 700ms + 1s buffer.
+      # You wrote the component so you know the exact total runtime.
+      time.sleep(TOTAL_ANIMATION_SECONDS + 0.7 + 1.0)
+
+      browser.close()
+
+  # 5. Stop ffmpeg gracefully — it will finalize the MP4
+  ffmpeg.send_signal(signal.SIGTERM)
+  try:
+      ffmpeg.wait(timeout=20)
+  except subprocess.TimeoutExpired:
+      ffmpeg.kill()
+
+  xvfb.terminate()
+  xvfb.wait()
+
+- Replace TOTAL_ANIMATION_SECONDS with the exact total duration of your animations (sum of all delays + durations). The final file is already at ./recordings/demo.mp4 — no further ffmpeg step is needed.
 
 OUTPUT FORMAT:
 Return ONLY valid JSON with two keys: "component" (string, the full TSX code) and "script" (string, the full Python code). No markdown, no explanation, just the raw JSON object.`

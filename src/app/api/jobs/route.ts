@@ -153,7 +153,11 @@ async function renderInDaytona(
       process.env.DAYTONA_RENDERER_IMAGE ||
       'ghcr.io/hvardhan878/demotape-renderer:latest'
     log(`Creating sandbox with image: ${image}`)
-    sandbox = await daytona.create({ image }, { timeout: 180 })
+    // Request 2 vCPU + 2 GiB RAM — headful Chrome + Xvfb + ffmpeg are CPU-hungry
+    sandbox = await daytona.create(
+      { image, resources: { cpu: 2, memory: 2 } },
+      { timeout: 180 }
+    )
     log(`Sandbox created: ${sandbox.id}`)
 
     // Write Claude-generated files
@@ -202,7 +206,7 @@ async function renderInDaytona(
       'python3 record.py',
       '/app',
       { DEMO_TOKEN: 'internal' },
-      120
+      180
     )
     log(`Playwright exit ${playwrightResult.exitCode}: ${playwrightResult.result}`)
 

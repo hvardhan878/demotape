@@ -6,6 +6,8 @@ RUN apt-get update && apt-get install -y \
   python3-pip \
   chromium \
   ffmpeg \
+  xvfb \
+  x11-utils \
   fonts-liberation \
   libgbm1 \
   libnss3 \
