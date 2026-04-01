@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import {
   Clock,
   Loader2,
@@ -15,6 +14,7 @@ import {
   RefreshCw,
   Sparkles,
 } from 'lucide-react'
+import WaitlistDialog from '@/components/WaitlistDialog'
 
 type JobStatus = 'queued' | 'generating' | 'rendering' | 'uploading' | 'complete' | 'failed'
 
@@ -28,12 +28,12 @@ type JobState = {
 const STATUS_STEPS: JobStatus[] = ['queued', 'generating', 'rendering', 'uploading', 'complete']
 
 const STATUS_LABELS: Record<JobStatus, string> = {
-  queued: 'Job queued...',
-  generating: 'Claude is writing your component...',
-  rendering: 'Playwright is recording...',
-  uploading: 'Uploading to storage...',
-  complete: 'Your demo is ready!',
-  failed: 'Render failed',
+  queued: 'Preparing project',
+  generating: 'Drafting layout',
+  rendering: 'Recording playback',
+  uploading: 'Finalizing video',
+  complete: 'Ready',
+  failed: 'Failed',
 }
 
 const getProgress = (status: JobStatus): number => {
@@ -51,9 +51,8 @@ type Props = {
 export default function JobPoller({ projectId, initialJobId, hasApiKey }: Props) {
   const [job, setJob] = useState<JobState | null>(null)
   const [generating, setGenerating] = useState(false)
-  const [reprompt, setReprompt] = useState('')
-  const [reprompting, setReprompting] = useState(false)
   const [error, setError] = useState('')
+  const [waitlistOpen, setWaitlistOpen] = useState(false)
 
   const pollJob = useCallback(async (jobId: string) => {
     try {
@@ -88,13 +87,9 @@ export default function JobPoller({ projectId, initialJobId, hasApiKey }: Props)
     }
   }, [initialJobId, pollJob])
 
-  const triggerJob = async (repromptText?: string) => {
+  const triggerJob = async () => {
     setError('')
-    if (repromptText !== undefined) {
-      setReprompting(true)
-    } else {
-      setGenerating(true)
-    }
+    setGenerating(true)
 
     try {
       const res = await fetch('/api/jobs', {
@@ -102,7 +97,6 @@ export default function JobPoller({ projectId, initialJobId, hasApiKey }: Props)
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           projectId,
-          reprompt: repromptText || undefined,
         }),
       })
 
@@ -122,12 +116,10 @@ export default function JobPoller({ projectId, initialJobId, hasApiKey }: Props)
 
       const { jobId } = await res.json()
       setJob({ id: jobId, status: 'queued' })
-      setReprompt('')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start render')
     } finally {
       setGenerating(false)
-      setReprompting(false)
     }
   }
 
@@ -158,14 +150,13 @@ export default function JobPoller({ projectId, initialJobId, hasApiKey }: Props)
           <Button
             onClick={() => triggerJob()}
             disabled={generating || keyGate}
-            className="bg-indigo-600 hover:bg-indigo-500 text-white gap-2 h-11 px-6 disabled:opacity-50"
+            type="button"
+            className="bg-[#E8621A] hover:bg-[#F5A623] text-white gap-2 h-11 px-6 disabled:opacity-50"
           >
             {generating ? (
               <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Sparkles className="w-4 h-4" />
-            )}
-            {generating ? 'Starting...' : 'Generate Demo Video'}
+            ) : null}
+            {generating ? 'Starting...' : 'Generate video'}
           </Button>
           {error && (
             <p className="text-sm text-red-400 flex items-center gap-1.5">
@@ -189,11 +180,11 @@ export default function JobPoller({ projectId, initialJobId, hasApiKey }: Props)
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               {job.status === 'complete' ? (
-                <CheckCircle className="w-5 h-5 text-emerald-400" />
+                <CheckCircle className="w-5 h-5 text-emerald-500" />
               ) : job.status === 'failed' ? (
-                <XCircle className="w-5 h-5 text-red-400" />
+                <XCircle className="w-5 h-5 text-red-500" />
               ) : (
-                <Loader2 className="w-5 h-5 text-indigo-400 animate-spin" />
+                <Loader2 className="w-5 h-5 text-[#E8621A] animate-spin" />
               )}
               <span className="text-sm font-medium text-white">
                 {STATUS_LABELS[job.status]}
@@ -203,19 +194,23 @@ export default function JobPoller({ projectId, initialJobId, hasApiKey }: Props)
               variant="outline"
               className={`text-xs capitalize ${
                 job.status === 'complete'
-                  ? 'border-emerald-500/40 text-emerald-400 bg-emerald-500/10'
+                  ? 'border-emerald-500/20 text-emerald-400 bg-emerald-500/10'
                   : job.status === 'failed'
-                  ? 'border-red-500/40 text-red-400 bg-red-500/10'
-                  : 'border-indigo-500/40 text-indigo-400 bg-indigo-500/10'
+                  ? 'border-red-500/20 text-red-400 bg-red-500/10'
+                  : 'border-[#E8621A]/20 text-[#E8621A] bg-[#E8621A]/10'
               }`}
             >
-              {job.status === 'queued' && <Clock className="w-3 h-3 mr-1" />}
               {job.status}
             </Badge>
           </div>
 
           {job.status !== 'failed' && (
-            <Progress value={getProgress(job.status)} className="h-1.5 bg-white/10" />
+            <div className="relative pt-1">
+              <Progress value={getProgress(job.status)} className="h-1.5 bg-white/5" />
+              <div className="absolute inset-0 flex items-center justify-between text-[10px] text-white/30 font-medium px-1">
+                <span>{getProgress(job.status)}%</span>
+              </div>
+            </div>
           )}
 
           {job.status === 'failed' && job.error && (
@@ -247,44 +242,37 @@ export default function JobPoller({ projectId, initialJobId, hasApiKey }: Props)
               className="border-white/20 text-white/80 hover:text-white hover:border-white/40 gap-2"
             >
               <Download className="w-4 h-4" />
-              Download WebM
+              Download MP4
             </Button>
           </a>
         </div>
       )}
 
-      {/* Reprompt */}
+      <WaitlistDialog
+        open={waitlistOpen}
+        onOpenChange={setWaitlistOpen}
+        title="Refine & regenerate — Pro waitlist"
+        description="Tweaking pacing, layout, or re-running generation with notes is a Pro feature. Join the waitlist and we’ll let you know when it’s available."
+      />
+
+      {/* Regenerate → waitlist (beta) */}
       {job && (job.status === 'complete' || job.status === 'failed') && (
         <div className="border-t border-white/[0.06] pt-6">
-          <p className="text-sm font-medium text-white/70 mb-3 flex items-center gap-2">
-            <RefreshCw className="w-4 h-4" />
+          <p className="mb-3 flex items-center gap-2 text-sm font-medium text-white/70">
+            <RefreshCw className="h-4 w-4" />
             Refine your demo
           </p>
-          <div className="flex gap-2">
-            <Input
-              value={reprompt}
-              onChange={(e) => setReprompt(e.target.value)}
-              placeholder='e.g. "Make it slower", "Add a screen showing the dashboard"'
-              className="bg-white/[0.05] border-white/10 text-white placeholder:text-white/20 focus:border-indigo-500"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && reprompt.trim() && !reprompting) {
-                  triggerJob(reprompt.trim())
-                }
-              }}
-            />
-            <Button
-              onClick={() => triggerJob(reprompt.trim())}
-              disabled={reprompting || !reprompt.trim() || keyGate}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white shrink-0"
-            >
-              {reprompting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Regenerate'}
-            </Button>
-          </div>
-          {error && (
-            <p className="text-sm text-red-400 mt-2 flex items-center gap-1.5">
-              <XCircle className="w-4 h-4" /> {error}
-            </p>
-          )}
+          <p className="mb-4 text-sm text-white/40">
+            Regeneration with custom notes isn&apos;t included in the beta. Join the Pro waitlist to
+            get early access.
+          </p>
+          <Button
+            type="button"
+            onClick={() => setWaitlistOpen(true)}
+            className="bg-[#E8621A] text-white hover:bg-[#F5A623]"
+          >
+            Join waitlist to regenerate
+          </Button>
         </div>
       )}
     </div>

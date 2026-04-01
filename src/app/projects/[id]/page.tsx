@@ -4,7 +4,8 @@ import { getSessionId, getDbSession } from '@/lib/session'
 import AppNav from '@/components/AppNav'
 import JobPoller from '@/components/JobPoller'
 import { Badge } from '@/components/ui/badge'
-import { Users, Clapperboard } from 'lucide-react'
+import Link from 'next/link'
+import { Users, Clapperboard, ChevronLeft } from 'lucide-react'
 
 type Props = { params: Promise<{ id: string }> }
 
@@ -36,6 +37,13 @@ export default async function ProjectPage({ params }: Props) {
     <div className="min-h-screen bg-[#030303]">
       <AppNav />
       <main className="max-w-4xl mx-auto px-6 py-10">
+        <Link
+          href="/dashboard"
+          className="mb-6 inline-flex items-center gap-1.5 text-sm text-white/40 transition-colors hover:text-white/70"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Back to Dashboard
+        </Link>
         <div className="mb-8">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>

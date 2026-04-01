@@ -20,10 +20,10 @@ import { Plus, X, AlertCircle, ChevronLeft, KeyRound } from 'lucide-react'
 import Link from 'next/link'
 
 const VIDEO_STYLES = [
-  { value: 'dark', label: 'Dark — deep blacks, neon accents' },
-  { value: 'minimal', label: 'Minimal — clean whites, subtle shadows' },
-  { value: 'bold', label: 'Bold — high contrast, punchy typography' },
-  { value: 'gradient', label: 'Gradient — vibrant mesh backgrounds' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'minimal', label: 'Minimal' },
+  { value: 'bold', label: 'Bold' },
+  { value: 'gradient', label: 'Gradient' },
 ]
 
 type Props = {
@@ -165,7 +165,7 @@ export default function NewProjectClient({ initialHasApiKey }: Props) {
                   value={productName}
                   onChange={(e) => setProductName(e.target.value)}
                   placeholder="e.g. Acme AI CRM"
-                  className="h-11 border-white/10 bg-white/[0.05] text-white placeholder:text-white/20 focus:border-indigo-500"
+                  className="h-11 border-white/10 bg-white/[0.05] text-white placeholder:text-white/20 focus:border-[#E8621A]"
                   required
                 />
               </div>
@@ -184,7 +184,7 @@ export default function NewProjectClient({ initialHasApiKey }: Props) {
                   value={description}
                   onChange={(e) => setDescription(e.target.value.slice(0, 500))}
                   placeholder="A WhatsApp-based AI business manager that connects to your tools and handles customer enquiries automatically"
-                  className="min-h-[100px] resize-none border-white/10 bg-white/[0.05] text-white placeholder:text-white/20 focus:border-indigo-500"
+                  className="min-h-[100px] resize-none border-white/10 bg-white/[0.05] text-white placeholder:text-white/20 focus:border-[#E8621A]"
                   required
                 />
               </div>
@@ -200,7 +200,7 @@ export default function NewProjectClient({ initialHasApiKey }: Props) {
                         value={feature}
                         onChange={(e) => updateFeature(i, e.target.value)}
                         placeholder={`Feature ${i + 1}, e.g. "AI replies to customer messages instantly"`}
-                        className="h-10 border-white/10 bg-white/[0.05] text-white placeholder:text-white/20 focus:border-indigo-500"
+                        className="h-10 border-white/10 bg-white/[0.05] text-white placeholder:text-white/20 focus:border-[#E8621A]"
                       />
                       {features.length > 1 && (
                         <button
@@ -218,7 +218,7 @@ export default function NewProjectClient({ initialHasApiKey }: Props) {
                   <button
                     type="button"
                     onClick={addFeature}
-                    className="mt-1 flex items-center gap-1.5 text-sm text-indigo-400 transition-colors hover:text-indigo-300"
+                    className="mt-1 flex items-center gap-1.5 text-sm text-[#E8621A] transition-colors hover:text-[#F5A623]"
                   >
                     <Plus className="h-3.5 w-3.5" /> Add feature
                   </button>
@@ -241,7 +241,7 @@ export default function NewProjectClient({ initialHasApiKey }: Props) {
                       value={brandColour}
                       onChange={(e) => setBrandColour(e.target.value)}
                       placeholder="#6366f1"
-                      className="h-10 border-white/10 bg-white/[0.05] font-mono text-sm text-white placeholder:text-white/20 focus:border-indigo-500"
+                      className="h-10 border-white/10 bg-white/[0.05] font-mono text-sm text-white placeholder:text-white/20 focus:border-[#E8621A]"
                     />
                     <input
                       id="colourPicker"
@@ -256,7 +256,7 @@ export default function NewProjectClient({ initialHasApiKey }: Props) {
                 <div className="space-y-2">
                   <Label className="text-sm text-white/70">Video style</Label>
                   <Select value={videoStyle} onValueChange={(val) => setVideoStyle(val ?? 'dark')}>
-                    <SelectTrigger className="h-10 border-white/10 bg-white/[0.05] text-white focus:ring-indigo-500">
+                    <SelectTrigger className="h-10 border-white/10 bg-white/[0.05] text-white focus:ring-[#E8621A]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="border-white/10 bg-[#1a1a1a]">
@@ -283,7 +283,7 @@ export default function NewProjectClient({ initialHasApiKey }: Props) {
                   value={targetAudience}
                   onChange={(e) => setTargetAudience(e.target.value)}
                   placeholder="e.g. UK mortgage brokers, early-stage startup founders"
-                  className="h-11 border-white/10 bg-white/[0.05] text-white placeholder:text-white/20 focus:border-indigo-500"
+                  className="h-11 border-white/10 bg-white/[0.05] text-white placeholder:text-white/20 focus:border-[#E8621A]"
                 />
               </div>
 
@@ -297,7 +297,7 @@ export default function NewProjectClient({ initialHasApiKey }: Props) {
               <Button
                 type="submit"
                 disabled={loading || !productName.trim() || !description.trim()}
-                className="h-11 w-full bg-indigo-600 text-base text-white hover:bg-indigo-500"
+                className="h-11 w-full bg-[#E8621A] text-base text-white hover:bg-[#F5A623]"
               >
                 {loading ? 'Creating project...' : 'Create Project'}
               </Button>

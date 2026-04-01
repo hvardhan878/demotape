@@ -7,8 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Key, Sparkles, CheckCircle, Loader2, AlertCircle } from 'lucide-react'
-
-const PRICE_OPTIONS = ['£5', '£10', '£15', '£20', '£30+']
+import { WAITLIST_PRICE_OPTIONS } from '@/lib/waitlist-options'
 
 type Props = {
   hasKey: boolean
@@ -185,7 +184,7 @@ export default function SettingsClient({ hasKey }: Props) {
                   How much would you pay per month?
                 </Label>
                 <div className="flex flex-wrap gap-2">
-                  {PRICE_OPTIONS.map((p) => (
+                  {WAITLIST_PRICE_OPTIONS.map((p) => (
                     <button
                       key={p}
                       type="button"

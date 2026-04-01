@@ -34,6 +34,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Claude API key not configured' }, { status: 400 })
   }
 
+  if (reprompt != null && String(reprompt).trim() !== '') {
+    return NextResponse.json(
+      {
+        error:
+          'Refining and regenerating demos is on the Pro waitlist. Join from the dashboard or project page.',
+      },
+      { status: 403 }
+    )
+  }
+
   const claudeApiKey = decryptApiKey(session.encrypted_claude_key)
 
   // Create job record
