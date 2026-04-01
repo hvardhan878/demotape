@@ -70,8 +70,8 @@ export async function generateDemoFiles(
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-opus-4-5',
-      // claude-opus-4-5 supports up to 32 768 output tokens.
+      model: 'claude-sonnet-4-5',
+      // claude-sonnet-4-5 supports up to 64 000 output tokens.
       // Component + script JSON can easily exceed 8 k tokens, bumping to 16 k
       // gives plenty of headroom while keeping latency reasonable.
       max_tokens: 16000,
