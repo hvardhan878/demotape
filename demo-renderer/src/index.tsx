@@ -1,7 +1,8 @@
-import { Composition } from 'remotion';
+import React from 'react';
+import { Composition, registerRoot } from 'remotion';
 import { Demo, DURATION_IN_FRAMES, FPS } from '../component';
 
-export const RemotionRoot: React.FC = () => {
+const RemotionRoot: React.FC = () => {
   return (
     <Composition
       id="Demo"
@@ -13,3 +14,5 @@ export const RemotionRoot: React.FC = () => {
     />
   );
 };
+
+registerRoot(RemotionRoot);
