@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Sparkles, Loader2, AlertCircle, CheckCircle } from 'lucide-react'
 import { WAITLIST_PRICE_OPTIONS } from '@/lib/waitlist-options'
+import { JoinDiscordButton } from '@/components/JoinDiscordButton'
 
 type Props = {
   open: boolean
@@ -128,13 +129,19 @@ export default function WaitlistDialog({
                 {error}
               </div>
             )}
-            <Button
-              type="submit"
-              disabled={loading || !email.trim() || !selectedPrice}
-              className="h-11 w-full bg-[#E8621A] text-white hover:bg-[#F5A623]"
-            >
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Join waitlist'}
-            </Button>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+              <Button
+                type="submit"
+                disabled={loading || !email.trim() || !selectedPrice}
+                className="h-11 flex-1 bg-[#E8621A] text-white hover:bg-[#F5A623] sm:min-w-0"
+              >
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Join waitlist'}
+              </Button>
+              <JoinDiscordButton
+                size="lg"
+                buttonClassName="h-11 w-full shrink-0 border-white/[0.12] sm:w-auto sm:min-w-[9.5rem]"
+              />
+            </div>
           </form>
         )}
       </DialogContent>

@@ -15,6 +15,7 @@ import {
   Sparkles,
 } from 'lucide-react'
 import WaitlistDialog from '@/components/WaitlistDialog'
+import { JoinDiscordButton } from '@/components/JoinDiscordButton'
 
 type JobStatus = 'queued' | 'generating' | 'rendering' | 'uploading' | 'complete' | 'failed'
 
@@ -266,13 +267,16 @@ export default function JobPoller({ projectId, initialJobId, hasApiKey }: Props)
             Regeneration with custom notes isn&apos;t included in the beta. Join the Pro waitlist to
             get early access.
           </p>
-          <Button
-            type="button"
-            onClick={() => setWaitlistOpen(true)}
-            className="bg-[#E8621A] text-white hover:bg-[#F5A623]"
-          >
-            Join waitlist to regenerate
-          </Button>
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-stretch">
+            <Button
+              type="button"
+              onClick={() => setWaitlistOpen(true)}
+              className="bg-[#E8621A] text-white hover:bg-[#F5A623] sm:w-auto"
+            >
+              Join waitlist to regenerate
+            </Button>
+            <JoinDiscordButton buttonClassName="border-white/[0.12] sm:min-w-[10rem]" />
+          </div>
         </div>
       )}
     </div>

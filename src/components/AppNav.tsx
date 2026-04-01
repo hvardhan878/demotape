@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { LayoutDashboard, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { JoinDiscordButton } from '@/components/JoinDiscordButton'
 import { cn } from '@/lib/utils'
 
 export default function AppNav() {
@@ -17,6 +18,7 @@ export default function AppNav() {
         </Link>
 
         <div className="flex items-center gap-1">
+          <JoinDiscordButton size="sm" buttonClassName="h-8 gap-2 text-sm mr-1 border-white/[0.12] text-white/60 hover:text-white/90" />
           <Link href="/dashboard">
             <Button
               variant="ghost"

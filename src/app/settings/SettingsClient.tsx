@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Key, Sparkles, CheckCircle, Loader2, AlertCircle } from 'lucide-react'
 import { WAITLIST_PRICE_OPTIONS } from '@/lib/waitlist-options'
+import { JoinDiscordButton } from '@/components/JoinDiscordButton'
 
 type Props = {
   hasKey: boolean
@@ -207,18 +208,21 @@ export default function SettingsClient({ hasKey }: Props) {
                 </div>
               )}
 
-              <Button
-                type="submit"
-                disabled={waitlistLoading || !waitlistEmail.trim() || !selectedPrice}
-                className="bg-indigo-600 hover:bg-indigo-500 text-white gap-2"
-              >
-                {waitlistLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Sparkles className="w-4 h-4" />
-                )}
-                Join waitlist
-              </Button>
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-stretch">
+                <Button
+                  type="submit"
+                  disabled={waitlistLoading || !waitlistEmail.trim() || !selectedPrice}
+                  className="gap-2 bg-indigo-600 hover:bg-indigo-500 text-white sm:w-auto"
+                >
+                  {waitlistLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-4 h-4" />
+                  )}
+                  Join waitlist
+                </Button>
+                <JoinDiscordButton buttonClassName="border-white/[0.12] sm:min-w-[10rem]" />
+              </div>
             </form>
           )}
         </CardContent>

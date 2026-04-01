@@ -4,9 +4,10 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Clapperboard, KeyRound, Sparkles, ChevronRight, FolderOpen } from 'lucide-react'
+import { Clapperboard, KeyRound, ChevronRight, FolderOpen } from 'lucide-react'
 import ApiKeyDialog from '@/components/ApiKeyDialog'
 import WaitlistDialog from '@/components/WaitlistDialog'
+import { JoinDiscordButton } from '@/components/JoinDiscordButton'
 
 export type DashboardProject = {
   id: string
@@ -129,13 +130,21 @@ export default function DashboardClient({
               ? 'You already have a project during the beta. Join the Pro waitlist for more projects and refinements.'
               : 'Create your first project — add product details, then generate a cinematic MP4.'}
           </p>
-          <Button
-            type="button"
-            onClick={handleCreateProject}
-            className="mt-6 h-12 w-full bg-[#E8621A] text-base text-white hover:bg-[#F5A623] sm:w-auto sm:px-8"
-          >
-            {hasProject ? 'More projects (Join waitlist)' : 'Create project'}
-          </Button>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-stretch">
+            <Button
+              type="button"
+              onClick={handleCreateProject}
+              className="h-12 w-full bg-[#E8621A] text-base text-white hover:bg-[#F5A623] sm:w-auto sm:px-8"
+            >
+              {hasProject ? 'More projects (Join waitlist)' : 'Create project'}
+            </Button>
+            {hasProject && (
+              <JoinDiscordButton
+                size="lg"
+                buttonClassName="h-12 w-full border-white/[0.12] text-base sm:w-auto sm:min-w-[10rem]"
+              />
+            )}
+          </div>
           {!hasApiKey && !hasProject && (
             <p className="mt-3 text-xs text-white/35">
               You&apos;ll be asked for your Anthropic API key first if you haven&apos;t added one yet.
