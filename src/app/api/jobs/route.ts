@@ -165,29 +165,71 @@ async function renderInDaytona(
       throw new Error(`npm install failed (exit ${installResult.exitCode}): ${installResult.result}`)
     }
 
-    // Run deterministic Framer Motion capture via Chrome Headless Shell + BeginFrame.
-    // capture.mjs: starts Next.js dev server, navigates, records virtual-time frames, outputs out/demo.mp4
-    log('Running capture.mjs (Chrome Headless Shell + BeginFrame)...')
-    const captureResult = await sandbox.process.executeCommand(
-      'node capture.mjs',
+    // Launch capture.mjs in the background so the HTTP connection can return immediately.
+    // The Daytona TCP socket drops after ~60-180 s for long-running synchronous commands;
+    // backgrounding avoids that by keeping each poll call short-lived.
+    log('Launching capture.mjs in background...')
+    const launchResult = await sandbox.process.executeCommand(
+      'nohup node capture.mjs > /app/capture.log 2>&1 & echo $! > /app/capture.pid && echo started',
       '/app',
       undefined,
-      360
+      30
     )
-    log(`capture exit ${captureResult.exitCode}: ${captureResult.result?.slice(-500)}`)
+    if (!launchResult.result?.includes('started')) {
+      throw new Error(`Failed to launch capture.mjs: ${launchResult.result}`)
+    }
+    log('capture.mjs launched, polling for completion...')
 
-    if (captureResult.exitCode !== 0) {
-      throw new Error(
-        `Capture failed (exit ${captureResult.exitCode}): ${captureResult.result?.slice(-1000)}`
+    // Poll every 10 s for up to 10 minutes
+    const MAX_WAIT_MS = 10 * 60 * 1000
+    const POLL_INTERVAL_MS = 10_000
+    const deadline = Date.now() + MAX_WAIT_MS
+
+    while (Date.now() < deadline) {
+      await new Promise(r => setTimeout(r, POLL_INTERVAL_MS))
+
+      // Check if output file exists (success) or process has exited (failure)
+      const poll = await sandbox.process.executeCommand(
+        'if [ -f /app/out/demo.mp4 ]; then echo "DONE"; ' +
+        'elif kill -0 $(cat /app/capture.pid 2>/dev/null) 2>/dev/null; then echo "RUNNING"; ' +
+        'else echo "STOPPED"; fi',
+        '/app',
+        undefined,
+        15
       )
+      const state = poll.result?.trim()
+      log(`poll: ${state}`)
+
+      if (state === 'DONE') {
+        log('demo.mp4 ready')
+        break
+      }
+
+      if (state === 'STOPPED') {
+        const captureLog = await sandbox.process.executeCommand(
+          'tail -50 /app/capture.log 2>/dev/null || echo "(no log)"',
+          '/app', undefined, 10
+        )
+        throw new Error(`capture.mjs exited without producing demo.mp4.\nLog:\n${captureLog.result}`)
+      }
+
+      // Still RUNNING — log progress tail
+      const tail = await sandbox.process.executeCommand(
+        'tail -3 /app/capture.log 2>/dev/null || true',
+        '/app', undefined, 10
+      )
+      if (tail.result?.trim()) log(`log tail: ${tail.result.trim()}`)
     }
 
-    // Verify output
-    const lsResult = await sandbox.process.executeCommand('ls -lh /app/out/', '/app')
+    // Final existence check
+    const lsResult = await sandbox.process.executeCommand('ls -lh /app/out/', '/app', undefined, 10)
     log(`out/ contents: ${lsResult.result}`)
-
     if (!lsResult.result?.includes('demo.mp4')) {
-      throw new Error(`demo.mp4 not found after capture. out/ contents: ${lsResult.result}`)
+      const captureLog = await sandbox.process.executeCommand(
+        'tail -80 /app/capture.log 2>/dev/null || echo "(no log)"',
+        '/app', undefined, 10
+      )
+      throw new Error(`demo.mp4 not found after polling timeout.\nLog:\n${captureLog.result}`)
     }
 
     // Download MP4
