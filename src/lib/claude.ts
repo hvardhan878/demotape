@@ -71,7 +71,10 @@ export async function generateDemoFiles(
     },
     body: JSON.stringify({
       model: 'claude-opus-4-5',
-      max_tokens: 8096,
+      // claude-opus-4-5 supports up to 32 768 output tokens.
+      // Component + script JSON can easily exceed 8 k tokens, bumping to 16 k
+      // gives plenty of headroom while keeping latency reasonable.
+      max_tokens: 16000,
       system: SYSTEM_PROMPT,
       messages: [
         {
@@ -88,6 +91,15 @@ export async function generateDemoFiles(
   }
 
   const data = await response.json()
+
+  // Detect truncated response before touching the content
+  const stopReason = data.stop_reason as string | undefined
+  if (stopReason === 'max_tokens') {
+    throw new Error(
+      'Claude response was truncated (max_tokens reached). The generated output was too long — try a simpler description or fewer features.'
+    )
+  }
+
   const content = data.content?.[0]?.text
 
   if (!content) {
@@ -98,7 +110,7 @@ export async function generateDemoFiles(
   try {
     parsed = JSON.parse(content)
   } catch {
-    // Try extracting JSON from the response if it has extra text
+    // Try extracting JSON from the response if it contains extra preamble/postamble
     const jsonMatch = content.match(/\{[\s\S]*\}/)
     if (!jsonMatch) throw new Error('Could not parse JSON from Claude response')
     parsed = JSON.parse(jsonMatch[0])
