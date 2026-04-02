@@ -189,3 +189,7 @@ Add all environment variables in the Vercel dashboard. The render pipeline runs 
 | Watermark | Yes (UI overlay) | No |
 | Download | WebM | WebM |
 | Reprompt | ✓ | ✓ |
+
+## License
+
+[MIT](LICENSE)
